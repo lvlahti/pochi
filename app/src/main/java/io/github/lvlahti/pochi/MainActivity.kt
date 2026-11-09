@@ -2,7 +2,10 @@ package io.github.lvlahti.pochi
 
 import android.Manifest
 import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -18,6 +21,7 @@ import android.view.animation.DecelerateInterpolator
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.Toast
 import android.widget.Spinner
 import android.widget.TextView
 
@@ -26,6 +30,11 @@ class MainActivity : Activity() {
     private lateinit var urlText: TextView
     private lateinit var startButton: Button
     private lateinit var stopButton: Button
+    private lateinit var settingsButton: Button
+    private lateinit var copyLinkButton: Button
+    private lateinit var shareLinkButton: Button
+    private lateinit var shareCard: View
+    private var currentShareUrl: String? = null
     private lateinit var transportSpinner: Spinner
     private lateinit var modeSpinner: Spinner
     private lateinit var resolutionSpinner: Spinner
@@ -54,6 +63,10 @@ class MainActivity : Activity() {
         urlText = findViewById(R.id.urlText)
         startButton = findViewById(R.id.startButton)
         stopButton = findViewById(R.id.stopButton)
+        settingsButton = findViewById(R.id.settingsButton)
+        copyLinkButton = findViewById(R.id.copyLinkButton)
+        shareLinkButton = findViewById(R.id.shareLinkButton)
+        shareCard = findViewById(R.id.shareCard)
         transportSpinner = findViewById(R.id.transportSpinner)
         modeSpinner = findViewById(R.id.modeSpinner)
         resolutionSpinner = findViewById(R.id.resolutionSpinner)
@@ -81,6 +94,12 @@ class MainActivity : Activity() {
             audioCheckbox.isEnabled = false
             audioCheckbox.text = "Internal audio requires Android 10+"
         }
+        transportSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
+                settingsButton.text = if (position == 0) "USB tethering settings   ↗" else "Wi-Fi settings   ↗"
+            }
+        }
         modeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -91,8 +110,21 @@ class MainActivity : Activity() {
                 bitrateLabel.visibility = if (mjpeg) View.GONE else View.VISIBLE
             }
         }
-        findViewById<Button>(R.id.settingsButton).setOnClickListener {
-            startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS))
+        settingsButton.setOnClickListener { openNetworkSettings() }
+        copyLinkButton.setOnClickListener {
+            val link = currentShareUrl ?: return@setOnClickListener
+            val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(ClipData.newPlainText("Pochi viewer link", link))
+            Toast.makeText(this, "Link copied", Toast.LENGTH_SHORT).show()
+        }
+        shareLinkButton.setOnClickListener {
+            val link = currentShareUrl ?: return@setOnClickListener
+            val share = Intent(Intent.ACTION_SEND).apply {
+                type = "text/plain"
+                putExtra(Intent.EXTRA_SUBJECT, "Pochi screen mirroring")
+                putExtra(Intent.EXTRA_TEXT, link)
+            }
+            startActivity(Intent.createChooser(share, "Share Pochi link"))
         }
         startButton.setOnClickListener {
             pendingSettings = StreamSettings(
@@ -123,7 +155,9 @@ class MainActivity : Activity() {
         renderStatus(CaptureService.status, CaptureService.url, CaptureService.running)
         animatePress(startButton)
         animatePress(stopButton)
-        animatePress(findViewById(R.id.settingsButton))
+        animatePress(settingsButton)
+        animatePress(copyLinkButton)
+        animatePress(shareLinkButton)
         animateEntrance()
     }
 
@@ -157,6 +191,145 @@ class MainActivity : Activity() {
             }
             false
         }
+    }
+
+    /**
+     * Android does not expose a guaranteed public deep link directly to the USB tether toggle.
+     * Prefer the tethering activity, and fall back safely on Xiaomi/HyperOS variants.
+     */
+    private fun openNetworkSettings() {
+        val usb = transportSpinner.selectedItemPosition == 0
+        val destinations = if (usb) listOf(
+            Intent("android.settings.TETHER_SETTINGS"),
+            Intent(Intent.ACTION_MAIN).setClassName(
+                "com.android.settings",
+                "com.android.settings.Settings" + '
+        val adapter = ArrayAdapter(this, R.layout.spinner_item, choices)
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item)
+        spinner.adapter = adapter
+    }
+
+    private fun requestProjection() {
+        val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        @Suppress("DEPRECATION")
+        startActivityForResult(manager.createScreenCaptureIntent(), CAPTURE_REQUEST)
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == AUDIO_PERMISSION_REQUEST) {
+            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) requestProjection()
+            else renderStatus("Microphone permission is needed for internal audio. Uncheck audio to share video only.", null, false)
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        val filter = IntentFilter(CaptureService.ACTION_STATUS)
+        if (Build.VERSION.SDK_INT >= 33) registerReceiver(statusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        else { @Suppress("DEPRECATION") registerReceiver(statusReceiver, filter) }
+        renderStatus(CaptureService.status, CaptureService.url, CaptureService.running)
+    }
+
+    override fun onStop() {
+        unregisterReceiver(statusReceiver)
+        super.onStop()
+    }
+
+    @Deprecated("Platform callback retained to avoid adding AndroidX runtime dependencies")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != CAPTURE_REQUEST) return
+        if (resultCode != RESULT_OK || data == null) {
+            renderStatus("Screen capture permission declined", null, false)
+            return
+        }
+        val service = Intent(this, CaptureService::class.java).apply {
+            action = CaptureService.ACTION_START
+            putExtra(CaptureService.EXTRA_RESULT_CODE, resultCode)
+            putExtra(CaptureService.EXTRA_RESULT_DATA, data)
+            pendingSettings.writeTo(this)
+        }
+        startForegroundService(service)
+        renderStatus("Starting capture…", null, true)
+    }
+
+    private fun renderStatus(message: String, link: String?, active: Boolean) {
+        val isError = message.startsWith("Error:", ignoreCase = true) ||
+            message.contains("declined", ignoreCase = true) ||
+            message.contains("permission is needed", ignoreCase = true)
+        // Only show YOU ARE LIVE after the service confirms it has a working URL.
+        val live = active && !link.isNullOrBlank() && !isError
+        val starting = active && !live && !isError
+
+        statusText.text = message
+        statusText.setTextColor(Color.parseColor(if (isError) "#FF6666" else "#DEDEDE"))
+        findViewById<TextView>(R.id.statusIndicator).setTextColor(
+            Color.parseColor(if (isError) "#FF6666" else if (live) "#49DE91" else "#A0A0A0")
+        )
+
+        startButton.text = when {
+            live -> "●  You are live"
+            starting -> "Starting live…"
+            else -> "Start live    →"
+        }
+        startButton.setBackgroundResource(
+            if (live) R.drawable.pochi_live_button else R.drawable.pochi_primary_button
+        )
+        startButton.setTextColor(Color.parseColor("#101010"))
+        startButton.isEnabled = !active
+        startButton.alpha = if (starting) 0.7f else 1f
+        stopButton.visibility = if (live) View.VISIBLE else View.GONE
+        stopButton.isEnabled = live
+
+        currentShareUrl = if (live) link else null
+        val wasVisible = shareCard.visibility == View.VISIBLE
+        shareCard.visibility = if (live) View.VISIBLE else View.GONE
+        urlText.text = currentShareUrl.orEmpty()
+        copyLinkButton.isEnabled = live
+        shareLinkButton.isEnabled = live
+
+        if (live && !wasVisible) {
+            shareCard.alpha = 0f
+            shareCard.translationY = 12f * resources.displayMetrics.density
+            shareCard.animate().alpha(1f).translationY(0f)
+                .setDuration(260L).setInterpolator(DecelerateInterpolator()).start()
+        } else if (!live) {
+            shareCard.animate().cancel()
+            shareCard.alpha = 1f
+            shareCard.translationY = 0f
+        }
+    }
+
+    companion object {
+        private const val CAPTURE_REQUEST = 2401
+        private const val AUDIO_PERMISSION_REQUEST = 2402
+        private val EDGES = listOf(640, 960, 1280, 1600, 1920)
+        private val FRAME_RATES = listOf(15, 24, 30, 60)
+        private val BITRATES = listOf(750, 1500, 2500, 4000, 6500, 10000)
+        private val QUALITIES = listOf(40, 55, 70, 85, 95)
+    }
+} + "TetherSettingsActivity"
+            ),
+            Intent(Settings.ACTION_SETTINGS)
+        ) else listOf(
+            Intent(Settings.ACTION_WIFI_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS)
+        )
+        for ((index, destination) in destinations.withIndex()) {
+            try {
+                startActivity(destination)
+                if (usb && index == destinations.lastIndex) {
+                    Toast.makeText(this, "Open Portable hotspot → USB tethering", Toast.LENGTH_LONG).show()
+                }
+                return
+            } catch (_: ActivityNotFoundException) {
+                // Different Android vendors expose different Settings screens.
+            } catch (_: SecurityException) {
+                // An OEM may block a non-system app from opening its internal activity.
+            }
+        }
+        Toast.makeText(this, "Open Settings → Portable hotspot → USB tethering", Toast.LENGTH_LONG).show()
     }
 
     private fun setup(spinner: Spinner, choices: Array<String>) {
