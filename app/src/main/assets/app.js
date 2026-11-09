@@ -36,6 +36,7 @@ let audioPlayHead = 0;
 function showStatus(text, online) {
   state.textContent = text;
   dot.classList.toggle('active', online);
+  document.body.classList.toggle('is-live', online);
 }
 function showError(text) { errorBox.textContent = text; }
 function showPicture() { placeholder.hidden = true; }
@@ -154,6 +155,7 @@ audioButton.addEventListener('click', async () => {
   if (audioEnabled) {
     audioEnabled = false;
     audioButton.textContent = 'Enable audio';
+    audioButton.classList.remove('is-engaged');
     audioButton.setAttribute('aria-pressed', 'false');
     volumeControl.hidden = true;
     audioLabel.textContent = 'Audio off';
@@ -175,6 +177,7 @@ audioButton.addEventListener('click', async () => {
     await audioContext.resume(); // Browser permits sound only after a user gesture.
     audioEnabled = true;
     audioButton.textContent = 'Mute audio';
+    audioButton.classList.add('is-engaged');
     audioButton.setAttribute('aria-pressed', 'true');
     volumeControl.hidden = false;
     connectAudio();
