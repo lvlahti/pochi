@@ -1,12 +1,18 @@
 # Pochi 🐾 — Android screen mirroring over USB or Wi-Fi
 
-**Pochi v0.3** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
+**Pochi v0.4** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
 
-## What's new in v0.3
+## What's new in v0.4
 
 - **Monochrome UI:** both the Android app and the browser receiver use only black, white, and grayscale. Error messages are the only red UI elements.
 - **Browser volume slider:** after clicking **Enable audio**, a 0–100% slider appears beside the button. The slider controls a Web Audio `GainNode` immediately and disappears when audio is muted.
-- All v0.2 features—USB/Wi-Fi, rotation handling, custom video quality/FPS/bitrate, and optional internal audio—remain available.
+- All v0.4 features—USB/Wi-Fi, rotation handling, custom video quality/FPS/bitrate, and optional internal audio—remain available.
+
+## v0.4 — Glass Edition
+
+The Android sender and browser receiver now share a polished monochrome design inspired by premium desktop and mobile controls. Both have layered panels, soft highlights, rounded controls and deliberate motion. The browser uses frosted-glass CSS backdrop blur; Android uses efficient native gradient drawables and light elevation (no expensive continuous background blur). Key Android actions use responsive press animations and settings cards enter with a gentle stagger. Audio controls still reveal the real 0–100% Web Audio volume slider after clicking **Enable audio**.
+
+**Color rule:** black, white and grays only; red is reserved for error messages. Web transitions respect the reduced-motion accessibility preference.
 
 ## Features
 
@@ -55,6 +61,6 @@ Debug builds are signed with Android's debug key (not intended as production-sig
 
 ## Status
 
-**v0.3 preview — CI build and unit tests; device-specific rotation/audio/Wi-Fi behavior should be tested on physical phones.** See `QUICKSTART-fa.md` for the Persian guide.
+**v0.4 preview — CI build and unit tests; device-specific rotation/audio/Wi-Fi behavior should be tested on physical phones.** See `QUICKSTART-fa.md` for the Persian guide.
 
 MIT License.
