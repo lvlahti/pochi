@@ -3,58 +3,88 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#080808">
-  <title>Pochi — Screen Mirror</title>
+  <meta name="theme-color" content="#070707">
+  <meta name="color-scheme" content="dark">
+  <title>Pochi — Your screen, beautifully mirrored</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
 </head>
 <body>
+  <div class="ambient ambient-one" aria-hidden="true"></div>
+  <div class="ambient ambient-two" aria-hidden="true"></div>
   <div class="shell">
-    <header>
-      <div class="brand"><span class="mark">●</span> POCHI <span class="subbrand">/ USB SCREEN MIRROR</span></div>
-      <div class="live"><span id="dot" class="dot"></span><span id="state">Connecting…</span></div>
+    <header class="masthead glass">
+      <div class="brand-lockup">
+        <div class="brand-symbol" aria-hidden="true"><span></span></div>
+        <div class="brand-type">
+          <strong>POCHI</strong>
+          <small>SCREEN MIRROR <span class="version">/ 0.4</span></small>
+        </div>
+      </div>
+      <div class="connection-state" role="status" aria-live="polite">
+        <span id="dot" class="dot"></span>
+        <span id="state">Connecting…</span>
+      </div>
     </header>
 
     <main>
-      <div class="heading">
-        <div>
-          <div class="eyebrow">ANDROID → YOUR BROWSER</div>
-          <h1>Your phone, on the big screen.</h1>
-          <p>USB or Wi-Fi · Local streaming · No receiver software</p>
-        </div>
-        <div class="toolbar">
-          <div class="audio-tools">
-            <button id="audioToggle" type="button" aria-controls="volumeControl" aria-pressed="false" hidden>Enable audio</button>
-            <div id="volumeControl" class="volume-control" role="group" aria-label="Audio volume" hidden>
-              <label for="audioVolume">Volume</label>
-              <input id="audioVolume" type="range" min="0" max="100" step="1" value="100" aria-label="Playback volume">
-              <output id="volumeValue" for="audioVolume">100%</output>
-            </div>
+      <section class="intro glass">
+        <div class="intro-text">
+          <div class="eyebrow"><span class="tiny-star">✦</span> DESIGNED FOR A BIGGER PICTURE</div>
+          <h1>Your screen.<br><span class="headline-soft">A little more magic.</span></h1>
+          <p>From your phone to any browser. Beautifully simple to connect, quietly powerful to use.</p>
+          <div class="feature-pills" aria-label="Features">
+            <span>USB + Wi-Fi</span><span>Low latency</span><span>Private session</span>
           </div>
-          <button id="reconnect" type="button">↻ Reconnect</button>
-          <button id="fullscreen" type="button" class="primary">⛶ Fullscreen</button>
+        </div>
+        <div class="intro-mark" aria-hidden="true"><div class="orb"><div class="orb-inner"></div></div></div>
+      </section>
+
+      <div class="toolbar" aria-label="Viewer controls">
+        <div class="audio-tools glass">
+          <button id="audioToggle" type="button" aria-controls="volumeControl" aria-pressed="false" hidden>Enable audio</button>
+          <div id="volumeControl" class="volume-control" role="group" aria-label="Audio volume" hidden>
+            <label for="audioVolume">VOL</label>
+            <input id="audioVolume" type="range" min="0" max="100" step="1" value="100" aria-label="Playback volume">
+            <output id="volumeValue" for="audioVolume">100%</output>
+          </div>
+        </div>
+        <div class="utility-actions glass">
+          <button id="reconnect" type="button" title="Reconnect to Pochi"><span aria-hidden="true">↻</span> Reconnect</button>
+          <button id="fullscreen" type="button" class="primary" title="Fullscreen viewer"><span aria-hidden="true">⛶</span> Fullscreen</button>
         </div>
       </div>
 
-      <div id="screen" class="screen">
-        <video id="video" autoplay muted playsinline></video>
-        <img id="mjpeg" alt="Live Android screen" hidden>
-        <div id="placeholder" class="placeholder">
-          <span class="pulse">◉</span>
-          <strong>Waiting for your screen</strong>
-          <small>Check that sharing is active in Pochi on Android.</small>
+      <section class="player-panel glass" aria-label="Phone screen mirror">
+        <div class="player-header">
+          <div class="player-title"><span class="live-indicator"></span> LIVE CANVAS <span class="player-hint">/ YOUR PHONE, IN REAL TIME</span></div>
+          <span class="window-controls" aria-hidden="true"><i></i><i></i><i></i></span>
         </div>
-        <div class="screen-label">POCHI / LIVE SCREEN MIRROR · V0.3</div>
-      </div>
+        <div id="screen" class="screen">
+          <video id="video" autoplay muted playsinline></video>
+          <img id="mjpeg" alt="Live Android screen" hidden>
+          <div id="placeholder" class="placeholder">
+            <div class="waiting-orb" aria-hidden="true"><span></span></div>
+            <strong>Ready when you are.</strong>
+            <small>Start sharing on your phone to see it here.</small>
+          </div>
+          <div class="screen-label"><span class="screen-label-dot">●</span> POCHI / LIVE MIRROR</div>
+        </div>
+        <div class="telemetry" aria-label="Stream details">
+          <div class="metric"><span class="metric-label">FORMAT</span><span id="mode" class="metric-value">Detecting…</span></div>
+          <div class="metric"><span class="metric-label">NETWORK</span><span id="transport" class="metric-value">Connecting…</span></div>
+          <div class="metric"><span class="metric-label">FRAMES</span><span id="fps" class="metric-value">— FPS</span></div>
+          <div class="metric"><span class="metric-label">LATENCY</span><span id="delay" class="metric-value">Low-latency</span></div>
+        </div>
+      </section>
 
-      <div class="footer">
-        <div><span class="green">●</span> <span id="mode">Detecting video mode</span> <span class="divider">/</span> <span id="transport">Connecting…</span></div>
-        <div><span id="fps">— FPS</span> <span class="divider">/</span> <span id="delay">Low-latency stream</span></div>
+      <div class="message-row">
+        <p id="audioStatus" class="audio-status">Video only</p>
+        <p id="error" class="error" role="alert"></p>
       </div>
-      <p id="audioStatus" class="audio-status">Video only</p>
-      <p id="error" class="error" role="status"></p>
-      <p class="privacy">This stream runs on the selected local USB or Wi-Fi network. Keep your private viewer link secret and use a trusted network. Audio capture requires app support and user consent on Android.</p>
+      <p class="privacy"><span aria-hidden="true">◇</span> A private, local viewing experience. Keep the session link to yourself, and use trusted USB or Wi-Fi networks. Audio requires capture consent on Android.</p>
     </main>
+    <footer class="site-footer"><span>POCHI / CREATED FOR THE BIG SCREEN</span><span>MONOCHROME EDITION · 0.4</span></footer>
   </div>
 </body>
 </html>

@@ -3,12 +3,12 @@
         <item name="android:fontFamily">sans</item>
         <item name="android:colorAccent">#FFFFFF</item>
         <item name="android:colorControlHighlight">#555555</item>
-        <item name="android:colorButtonNormal">#252525</item>
+        <item name="android:colorButtonNormal">#303030</item>
         <item name="android:textColorPrimary">#FFFFFF</item>
         <item name="android:textColorSecondary">#BDBDBD</item>
-        <item name="android:windowBackground">#080808</item>
-        <item name="android:statusBarColor">#080808</item>
-        <item name="android:navigationBarColor">#080808</item>
+        <item name="android:windowBackground">#060606</item>
+        <item name="android:statusBarColor">#060606</item>
+        <item name="android:navigationBarColor">#060606</item>
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>
