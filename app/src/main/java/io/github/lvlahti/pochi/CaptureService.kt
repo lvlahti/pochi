@@ -466,6 +466,7 @@ class CaptureService : Service() {
         const val EXTRA_VIEWER_IP = "viewer_ip"
         @Volatile private var activeServer: StreamServer? = null
 
+        fun streamStats(): StreamServer.Stats? = activeServer?.stats()
         fun pendingViewers(): List<ViewerGate.Request> = activeServer?.pendingViewers().orEmpty()
         fun decideViewer(id: String, allow: Boolean): Boolean =
             activeServer?.decideViewer(id, allow) ?: false
