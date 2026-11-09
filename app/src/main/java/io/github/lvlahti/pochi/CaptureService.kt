@@ -30,6 +30,7 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
 import android.os.Looper
+import android.os.Bundle
 import android.os.SystemClock
 import android.util.Log
 import android.view.Display
@@ -57,6 +58,34 @@ class CaptureService : Service() {
     @Volatile private var videoGeneration = 0
     @Volatile private var stopping = false
     @Volatile private var audioRunning = false
+    @Volatile private var jpegQuality = 70
+    @Volatile private var frameIntervalMs = 42L
+    private var lastPacketDrops = 0L
+    private var qualityController: AutoQuality? = null
+    private val qualityTicker = object : Runnable {
+        override fun run() {
+            if (stopping || !::settings.isInitialized) return
+            val current = server?.stats()
+            if (settings.autoQuality && current != null && current.viewers > 0) {
+                val congested = current.queueDepth >= 5 ||
+                    current.dropped > lastPacketDrops || current.viewerLagMs >= 600
+                lastPacketDrops = current.dropped
+                if (settings.mode == StreamSettings.MODE_H264) {
+                    val bitrate = qualityController?.update(congested)
+                    if (bitrate != null) runCatching {
+                        codec?.setParameters(Bundle().apply {
+                            putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, bitrate * 1000)
+                        })
+                    }.onFailure { Log.w(TAG, "Dynamic bitrate not supported by encoder", it) }
+                } else {
+                    jpegQuality = (jpegQuality + if (congested) -7 else 2).coerceIn(40, settings.jpegQuality)
+                    frameIntervalMs = if (congested) (frameIntervalMs + 18L).coerceAtMost(150L)
+                        else (frameIntervalMs - 7L).coerceAtLeast(1000L / settings.fps)
+                }
+            }
+            mainHandler.postDelayed(this, 3000L)
+        }
+    }
 
     private data class Geometry(val width: Int, val height: Int, val dpi: Int)
 
@@ -92,6 +121,7 @@ class CaptureService : Service() {
 
     private fun requestResize() {
         mainHandler.removeCallbacks(resizeRunnable)
+        mainHandler.removeCallbacks(qualityTicker)
         mainHandler.postDelayed(resizeRunnable, 350)
     }
 
@@ -109,7 +139,14 @@ class CaptureService : Service() {
                         ?: error(if (settings.transport == StreamSettings.TRANSPORT_WIFI)
                             "Wi-Fi IPv4 not found. Connect both devices to one Wi-Fi network."
                             else "USB tethering not found. Connect a data cable and enable USB tethering.")
-                    server = StreamServer(this, ip, settings).also { it.start() }
+                    server = StreamServer(this, ip, settings, onViewerPending = { viewer ->
+                        notifyViewerPending(viewer)
+                    }).also { it.start() }
+                    activeServer = server
+                    qualityController = AutoQuality(settings.bitrateKbps)
+                    jpegQuality = settings.jpegQuality
+                    frameIntervalMs = 1000L / settings.fps
+                    lastPacketDrops = 0L
                     val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
                     @Suppress("DEPRECATION")
                     val resultData = intent.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
@@ -127,6 +164,7 @@ class CaptureService : Service() {
                     buildVideo(captureSize(settings.maxEdge))
                     displayManager.registerDisplayListener(displayListener, mainHandler)
                     if (settings.audio) startInternalAudio()
+                    mainHandler.postDelayed(qualityTicker, 3000L)
                     notifyStatus("Sharing ${settings.transport.uppercase()} (${settings.mode.uppercase()}, ${settings.fps} FPS${if (audioRunning) ", audio on" else ""})", server?.url, true)
                 } catch (error: Exception) {
                     Log.e(TAG, "Capture could not start", error)
@@ -156,6 +194,24 @@ class CaptureService : Service() {
         if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION_ID, notification,
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
         else { @Suppress("DEPRECATION") startForeground(NOTIFICATION_ID, notification) }
+    }
+
+    private fun notifyViewerPending(viewer: ViewerGate.Request) {
+        sendBroadcast(Intent(ACTION_VIEWER_PENDING).setPackage(packageName).apply {
+            putExtra(EXTRA_VIEWER_ID, viewer.id)
+            putExtra(EXTRA_VIEWER_IP, viewer.ip)
+        })
+        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(NotificationChannel(VIEWER_CHANNEL, "Viewer approval",
+            NotificationManager.IMPORTANCE_HIGH))
+        val open = PendingIntent.getActivity(this, 8, Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        manager.notify(VIEWER_NOTIFICATION_ID, Notification.Builder(this, VIEWER_CHANNEL)
+            .setSmallIcon(android.R.drawable.ic_menu_view)
+            .setContentTitle("Pochi: viewer requests access")
+            .setContentText("Device ${viewer.ip} is waiting. Tap to Allow or Deny.")
+            .setContentIntent(open).setAutoCancel(true).build())
     }
 
     private fun captureSize(limit: Int): Geometry {
@@ -258,6 +314,7 @@ class CaptureService : Service() {
                             buffer.limit(info.offset + info.size)
                             val frame = ByteArray(info.size)
                             buffer.get(frame)
+                            server?.recordVideoFrame(frame.size)
                             muxer?.offerFrame(frame, info.presentationTimeUs,
                                 info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0)
                                 ?.forEach { server?.publishFragment(it) }
@@ -288,12 +345,11 @@ class CaptureService : Service() {
         imageThread = thread
         val generation = ++videoGeneration
         var lastFrameAt = 0L
-        val minInterval = 1000L / settings.fps
         reader.setOnImageAvailableListener({ source ->
             val frame = source.acquireLatestImage() ?: return@setOnImageAvailableListener
             try {
                 val now = SystemClock.elapsedRealtime()
-                if (stopping || generation != videoGeneration || now - lastFrameAt < minInterval)
+                if (stopping || generation != videoGeneration || now - lastFrameAt < frameIntervalMs)
                     return@setOnImageAvailableListener
                 lastFrameAt = now
                 val plane = frame.planes.firstOrNull() ?: return@setOnImageAvailableListener
@@ -305,8 +361,10 @@ class CaptureService : Service() {
                     val cropped = Bitmap.createBitmap(raw, 0, 0, width, height)
                     try {
                         val encoded = ByteArrayOutputStream()
-                        cropped.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, encoded)
-                        server?.publishJpeg(encoded.toByteArray())
+                        cropped.compress(Bitmap.CompressFormat.JPEG, jpegQuality, encoded)
+                        val bytes = encoded.toByteArray()
+                        server?.recordVideoFrame(bytes.size)
+                        server?.publishJpeg(bytes)
                     } finally { cropped.recycle() }
                 } finally { raw.recycle() }
             } catch (error: Exception) {
@@ -346,7 +404,7 @@ class CaptureService : Service() {
                 try {
                     while (audioRunning && !stopping) {
                         val n = recorder.read(chunk, 0, chunk.size, AudioRecord.READ_BLOCKING)
-                        if (n > 0) server?.publishAudio(chunk.copyOf(n))
+                        if (n > 0) server?.publishAudio(chunk.copyOf(n), SystemClock.elapsedRealtime())
                         else if (n < 0) break
                     }
                 } catch (error: Exception) {
@@ -389,7 +447,9 @@ class CaptureService : Service() {
         runCatching { projection?.stop() }
         projection = null
         server?.close()
+        activeServer = null
         server = null
+        (getSystemService(NOTIFICATION_SERVICE) as NotificationManager).cancel(VIEWER_NOTIFICATION_ID)
         if (!status.startsWith("Error:")) notifyStatus("Not sharing", null, false)
         else running = false
         super.onDestroy()
@@ -399,6 +459,17 @@ class CaptureService : Service() {
         private const val TAG = "PochiCapture"
         private const val CHANNEL_ID = "pochi_media_projection"
         private const val NOTIFICATION_ID = 41
+        private const val VIEWER_NOTIFICATION_ID = 42
+        private const val VIEWER_CHANNEL = "pochi_viewer_approval"
+        const val ACTION_VIEWER_PENDING = "io.github.lvlahti.pochi.VIEWER_PENDING"
+        const val EXTRA_VIEWER_ID = "viewer_id"
+        const val EXTRA_VIEWER_IP = "viewer_ip"
+        @Volatile private var activeServer: StreamServer? = null
+
+        fun streamStats(): StreamServer.Stats? = activeServer?.stats()
+        fun pendingViewers(): List<ViewerGate.Request> = activeServer?.pendingViewers().orEmpty()
+        fun decideViewer(id: String, allow: Boolean): Boolean =
+            activeServer?.decideViewer(id, allow) ?: false
         const val ACTION_START = "io.github.lvlahti.pochi.START"
         const val ACTION_STOP = "io.github.lvlahti.pochi.STOP"
         const val ACTION_STATUS = "io.github.lvlahti.pochi.STATUS"

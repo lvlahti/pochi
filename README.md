@@ -1,26 +1,37 @@
 # Pochi 🐾 — Android screen mirroring over USB or Wi-Fi
 
-**Pochi v0.5** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
+**Pochi v0.6** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
 
-## What's new in v0.5
+## What's new in v0.6
 
 - **Monochrome UI:** both the Android app and the browser receiver use only black, white, and grayscale. Error messages are the only red UI elements.
 - **Browser volume slider:** after clicking **Enable audio**, a 0–100% slider appears beside the button. The slider controls a Web Audio `GainNode` immediately and disappears when audio is muted.
-- All v0.5 features—USB/Wi-Fi, rotation handling, custom video quality/FPS/bitrate, and optional internal audio—remain available.
+- All v0.6 features—USB/Wi-Fi, rotation handling, custom video quality/FPS/bitrate, and optional internal audio—remain available.
 
-## v0.5 — Glass Edition
+## v0.6 — Glass Edition
 
 The Android sender and browser receiver now share a polished monochrome design inspired by premium desktop and mobile controls. Both have layered panels, soft highlights, rounded controls and deliberate motion. The browser uses frosted-glass CSS backdrop blur; Android uses efficient native gradient drawables and light elevation (no expensive continuous background blur). Key Android actions use responsive press animations and settings cards enter with a gentle stagger. Audio controls still reveal the real 0–100% Web Audio volume slider after clicking **Enable audio**.
 
 **Color rule:** black, white and grays only; red is reserved for error messages. Web transitions respect the reduced-motion accessibility preference.
 
-## v0.5 — live controls, secure-by-default link sharing and connection settings
+## v0.6 — live controls, secure-by-default link sharing and connection settings
 
 - **Live button states:** the Start live button becomes a green, disabled **You are live** indicator only after screen sharing succeeds and a browser URL is ready. A red **Stop live** button appears beneath it, and disappears when sharing stops. While Android capture permission is processing, the start button displays **Starting live…**.
 - **Copy or share viewer link:** a polished link card appears only during a confirmed session. **Copy link** copies the entire URL (including its temporary access token) to the clipboard; **Share** opens Android's share sheet so you can send the same link to another app. Don't share the link outside your trusted USB/Wi-Fi network.
 - **Network settings shortcut:** when USB is selected, attempts to open Android's tethering settings via `android.settings.TETHER_SETTINGS`; if unsupported it tries the system tethering activity, then Settings with the manual guidance `Portable hotspot → USB tethering`. When Wi-Fi is selected, the button opens Wi-Fi settings. Xiaomi/HyperOS may block deep links, so no third-party app can guarantee a direct jump to the USB tethering toggle.
 
 The glass visual style, hardware-encoded H.264, optional MJPEG, local USB/Wi-Fi streaming, rotation and experimental internal audio remain in place.
+
+## v0.6 — streaming, performance and privacy
+
+1. **Auto Quality:** optional on-device AIMD tuning of H.264 encoder bitrate via `MediaCodec.setParameters` without restarting screen capture. For MJPEG, quality and frame interval react to queue backpressure. Your selected settings remain upper limits. If a hardware encoder doesn't support dynamic bitrate, the phone keeps its original bitrate.
+2. **Cinema Mode:** a distraction-free full-viewport browser view with auto-hiding glass controls; move the mouse or touch to reveal controls, and press Escape to exit.
+3. **QR Code:** scan the QR inside the share card to open the **complete session URL** with its token. The QR contains local IP information and requires the devices to be on the same accessible network.
+4. **Live performance dashboard:** browser and Android show observed FPS, video bitrate and connected viewers. The browser also reports its **playback buffer** to the sender. This is *not* a verified end-to-end capture-to-display latency measurement.
+5. **Viewer approval:** each browser creates a random viewer ID and first requests permission. The phone shows an Allow/Deny prompt, including remote IP. **No /status, /ws, /audio or /mjpeg stream is accessible before approval.** A notification prompts the owner to return to Pochi when it is backgrounded. Approval applies to a viewer ID *and IP* for the current capture session; stopping streaming invalidates it. Local HTTP is not encrypted, so this is **not protection against an on-network attacker who can intercept traffic**.
+6. **Improved audio alignment:** the phone timestamps 48 kHz mono PCM packets with Android elapsed realtime, the browser estimates clock offset and schedules a bounded audio queue based on measured playback-buffer delay. Exact frame-accurate synchronization is **not guaranteed**; DRM/audio capture restrictions continue to apply.
+
+**Note:** QR creation uses ZXing Core offline. No cloud server is used. Browser features require modern Chrome/Edge.
 
 ## Features
 
@@ -69,6 +80,6 @@ Debug builds are signed with Android's debug key (not intended as production-sig
 
 ## Status
 
-**v0.5 preview — CI build and unit tests; device-specific rotation/audio/Wi-Fi behavior should be tested on physical phones.** See `QUICKSTART-fa.md` for the Persian guide.
+**v0.6 preview — CI build and unit tests; device-specific rotation/audio/Wi-Fi behavior should be tested on physical phones.** See `QUICKSTART-fa.md` for the Persian guide.
 
 MIT License.
