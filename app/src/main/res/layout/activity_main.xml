@@ -59,7 +59,7 @@
                 android:gravity="center"
                 android:paddingLeft="13dp"
                 android:paddingRight="13dp"
-                android:text="v 0.5"
+                android:text="v 0.6"
                 android:textColor="#E9E9E9"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -261,6 +261,22 @@
                 android:layout_marginTop="8dp"
                 android:background="@drawable/pochi_glass_field"
                 android:visibility="gone" />
+            <CheckBox
+                android:id="@+id/autoQualityCheckbox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:buttonTint="#FFFFFF"
+                android:text="Auto Quality · reduce buffering"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:text="Adaptive bitrate (H.264) or JPEG quality/FPS based on viewer backlog. Your selected values remain maximums."
+                android:textColor="#A4A4A4"
+                android:textSize="11sp" />
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -377,6 +393,16 @@
                     android:textColor="#DCDCDC"
                     android:textSize="13sp" />
             </LinearLayout>
+            <TextView
+                android:id="@+id/liveStatsText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textColor="#D3D3D3"
+                android:textSize="12sp"
+                android:visibility="gone"
+                android:lineSpacingExtra="4dp"
+                android:text="FPS —  ·  kbps —  ·  viewers —" />
             <LinearLayout
                 android:id="@+id/shareCard"
                 android:layout_width="match_parent"
@@ -405,6 +431,23 @@
                     android:textIsSelectable="true"
                     android:textSize="13sp"
                     android:lineSpacingExtra="4dp" />
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:text="SCAN TO CONNECT"
+                    android:textColor="#C9C9C9"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.12" />
+                <ImageView
+                    android:id="@+id/qrImage"
+                    android:layout_width="196dp"
+                    android:layout_height="196dp"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="12dp"
+                    android:background="#FFFFFF"
+                    android:padding="7dp"
+                    android:contentDescription="Scannable private session URL" />
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
