@@ -12,7 +12,9 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.graphics.Color
+import android.view.MotionEvent
 import android.view.View
+import android.view.animation.DecelerateInterpolator
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
@@ -119,10 +121,48 @@ class MainActivity : Activity() {
             startService(Intent(this, CaptureService::class.java).apply { action = CaptureService.ACTION_STOP })
         }
         renderStatus(CaptureService.status, CaptureService.url, CaptureService.running)
+        animatePress(startButton)
+        animatePress(stopButton)
+        animatePress(findViewById(R.id.settingsButton))
+        animateEntrance()
+    }
+
+    /** Gentle card reveal; only on app launch, so the stream is never interrupted. */
+    private fun animateEntrance() {
+        val ids = intArrayOf(R.id.heroCard, R.id.connectionCard, R.id.videoCard, R.id.audioCard, R.id.controlCard)
+        val offset = 16f * resources.displayMetrics.density
+        ids.forEachIndexed { index, id ->
+            val panel = findViewById<View>(id)
+            panel.alpha = 0f
+            panel.translationY = offset
+            panel.animate()
+                .alpha(1f)
+                .translationY(0f)
+                .setStartDelay(45L * index)
+                .setDuration(420L)
+                .setInterpolator(DecelerateInterpolator())
+                .start()
+        }
+    }
+
+    /** Native responsive press effect; returns false so normal clicks still fire. */
+    private fun animatePress(button: View) {
+        button.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN ->
+                    view.animate().scaleX(0.975f).scaleY(0.975f).setDuration(90L).start()
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL ->
+                    view.animate().scaleX(1f).scaleY(1f).setDuration(180L)
+                        .setInterpolator(DecelerateInterpolator()).start()
+            }
+            false
+        }
     }
 
     private fun setup(spinner: Spinner, choices: Array<String>) {
-        spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, choices)
+        val adapter = ArrayAdapter(this, R.layout.spinner_item, choices)
+        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item)
+        spinner.adapter = adapter
     }
 
     private fun requestProjection() {
@@ -176,6 +216,9 @@ class MainActivity : Activity() {
             message.contains("declined", ignoreCase = true) ||
             message.contains("permission is needed", ignoreCase = true)
         statusText.setTextColor(Color.parseColor(if (isError) "#FF5555" else "#DEDEDE"))
+        findViewById<TextView>(R.id.statusIndicator).setTextColor(Color.parseColor(
+            if (isError) "#FF5555" else if (active) "#FFFFFF" else "#A0A0A0"
+        ))
         urlText.text = link.orEmpty()
         startButton.isEnabled = !active
         stopButton.isEnabled = active
