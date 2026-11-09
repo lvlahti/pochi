@@ -42,8 +42,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Pochi-v0.5-debug.apk
-          gh release create "preview-${{ github.run_number }}" Pochi-v0.5-debug.apk \
-            --title "Pochi v0.5 preview #${{ github.run_number }}" \
-            --notes 'Pochi v0.5: confirmed green live state, red stop button, private share URL with copy/share and Android tether settings navigation; requires device testing.' \
+          cp app/build/outputs/apk/debug/app-debug.apk Pochi-v0.6-debug.apk
+          gh release create "preview-${{ github.run_number }}" Pochi-v0.6-debug.apk \
+            --title "Pochi v0.6 preview #${{ github.run_number }}" \
+            --notes 'Pochi v0.6 experimental: auto video bitrate, Cinema Mode, QR viewer link, stream dashboard, per-viewer Android approval and bounded timestamp-aware audio. Requires on-device verification.' \
             --prerelease --latest=false
