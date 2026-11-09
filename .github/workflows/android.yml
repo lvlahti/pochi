@@ -42,8 +42,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Pochi-v0.4-debug.apk
-          gh release create "preview-${{ github.run_number }}" Pochi-v0.4-debug.apk \
-            --title "Pochi v0.4 preview #${{ github.run_number }}" \
-            --notes 'Pochi v0.4 Glass Edition: monochrome layered native Android UI, frosted glass browser and animated controls; experimental build requiring device testing.' \
+          cp app/build/outputs/apk/debug/app-debug.apk Pochi-v0.5-debug.apk
+          gh release create "preview-${{ github.run_number }}" Pochi-v0.5-debug.apk \
+            --title "Pochi v0.5 preview #${{ github.run_number }}" \
+            --notes 'Pochi v0.5: confirmed green live state, red stop button, private share URL with copy/share and Android tether settings navigation; requires device testing.' \
             --prerelease --latest=false
