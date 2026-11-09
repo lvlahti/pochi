@@ -11,8 +11,8 @@ android {
         applicationId = "io.github.lvlahti.pochi"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.5.0"
+        versionCode = 6
+        versionName = "0.6.0"
     }
     buildTypes {
         release {
@@ -30,5 +30,6 @@ android {
 }
 
 dependencies {
+    implementation("com.google.zxing:core:3.5.3")
     testImplementation("junit:junit:4.13.2")
 }
