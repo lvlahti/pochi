@@ -83,6 +83,7 @@ function closeStream() {
   video.hidden = false;
   placeholder.hidden = false;
   audioPlayHead = 0;
+  lastVideoBufferMs = 0;
 }
 
 function pump() {
@@ -131,17 +132,28 @@ function configureMse(mime) {
 function audioSamples(arrayBuffer) {
   if (!audioContext || audioContext.state !== 'running' || !audioEnabled) return;
   const view = new DataView(arrayBuffer);
-  const samples = Math.floor(view.byteLength / 2);
+  if (view.byteLength <= 8) return;
+  // Each packet has the Android elapsed-realtime timestamp in little-endian ms.
+  const capturedMs = view.getUint32(0, true) + view.getUint32(4, true) * 4294967296;
+  const ageMs = clockOffsetMs == null ? 0 :
+    Math.max(0, performance.now() - (capturedMs + clockOffsetMs));
+  if (ageMs > 900) return; // stale packet: avoid cumulative sound delay
+  const samples = Math.floor((view.byteLength - 8) / 2);
   if (!samples) return;
   const sound = audioContext.createBuffer(1, samples, 48000);
   const channel = sound.getChannelData(0);
-  for (let i = 0; i < samples; i++) channel[i] = view.getInt16(i * 2, true) / 32768;
+  for (let i = 0; i < samples; i++) channel[i] = view.getInt16(8 + i * 2, true) / 32768;
   const source = audioContext.createBufferSource();
   source.buffer = sound;
   source.connect(audioGain || audioContext.destination);
   const now = audioContext.currentTime;
-  if (!audioPlayHead || audioPlayHead < now || audioPlayHead > now + .45) {
-    audioPlayHead = now + .14; // keep queue short, drop late audio instead of accumulating lag
+  const visualBuffer = video.buffered.length > 0
+    ? Math.max(0, video.buffered.end(video.buffered.length - 1) - video.currentTime) : .12;
+  // Match the measured browser video buffer while compensating for captured audio age.
+  // Not frame-accurate A/V synchronization: the browser pipeline is asynchronous.
+  const desiredDelay = Math.max(.05, Math.min(.35, visualBuffer + .1 - ageMs / 1000));
+  if (!audioPlayHead || audioPlayHead < now + .025 || audioPlayHead > now + .48) {
+    audioPlayHead = now + desiredDelay;
   }
   source.start(audioPlayHead);
   audioPlayHead += sound.duration;
@@ -332,6 +344,29 @@ setInterval(() => {
   renderedFrames = 0;
   lastFpsTime = now;
 }, 1500);
+
+function revealCinemaControls() {
+  if (!document.body.classList.contains('cinema')) return;
+  document.body.classList.add('cinema-controls');
+  clearTimeout(cinemaHideTimer);
+  cinemaHideTimer = setTimeout(() => document.body.classList.remove('cinema-controls'), 2500);
+}
+function toggleCinema(force) {
+  const enabled = typeof force === 'boolean' ? force : !document.body.classList.contains('cinema');
+  document.body.classList.toggle('cinema', enabled);
+  document.body.classList.toggle('cinema-controls', enabled);
+  cinemaToggle.setAttribute('aria-pressed', String(enabled));
+  cinemaToggle.textContent = enabled ? '✕ Exit cinema' : '▣ Cinema mode';
+  if (enabled) revealCinemaControls();
+  else clearTimeout(cinemaHideTimer);
+}
+cinemaToggle.addEventListener('click', () => toggleCinema());
+document.addEventListener('mousemove', revealCinemaControls);
+document.addEventListener('touchstart', revealCinemaControls, { passive: true });
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && document.body.classList.contains('cinema')) toggleCinema(false);
+  else if (document.body.classList.contains('cinema')) revealCinemaControls();
+});
 
 document.getElementById('fullscreen').addEventListener('click', () => {
   if (document.fullscreenElement) document.exitFullscreen();
