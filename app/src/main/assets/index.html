@@ -18,7 +18,7 @@
         <div class="brand-symbol" aria-hidden="true"><span></span></div>
         <div class="brand-type">
           <strong>POCHI</strong>
-          <small>SCREEN MIRROR <span class="version">/ 0.4</span></small>
+          <small>SCREEN MIRROR <span class="version">/ 0.6</span></small>
         </div>
       </div>
       <div class="connection-state" role="status" aria-live="polite">
@@ -50,6 +50,7 @@
           </div>
         </div>
         <div class="utility-actions glass">
+          <button id="cinemaToggle" type="button" aria-pressed="false" title="Hide distractions and enlarge the picture"><span aria-hidden="true">▣</span> Cinema mode</button>
           <button id="reconnect" type="button" title="Reconnect to Pochi"><span aria-hidden="true">↻</span> Reconnect</button>
           <button id="fullscreen" type="button" class="primary" title="Fullscreen viewer"><span aria-hidden="true">⛶</span> Fullscreen</button>
         </div>
@@ -63,7 +64,7 @@
         <div id="screen" class="screen">
           <video id="video" autoplay muted playsinline></video>
           <img id="mjpeg" alt="Live Android screen" hidden>
-          <div id="placeholder" class="placeholder">
+          <div id="placeholder" class="placeholder" aria-live="polite">
             <div class="waiting-orb" aria-hidden="true"><span></span></div>
             <strong>Ready when you are.</strong>
             <small>Start sharing on your phone to see it here.</small>
@@ -74,7 +75,10 @@
           <div class="metric"><span class="metric-label">FORMAT</span><span id="mode" class="metric-value">Detecting…</span></div>
           <div class="metric"><span class="metric-label">NETWORK</span><span id="transport" class="metric-value">Connecting…</span></div>
           <div class="metric"><span class="metric-label">FRAMES</span><span id="fps" class="metric-value">— FPS</span></div>
-          <div class="metric"><span class="metric-label">LATENCY</span><span id="delay" class="metric-value">Low-latency</span></div>
+          <div class="metric"><span class="metric-label">BUFFER / NOT END-TO-END</span><span id="delay" class="metric-value">—</span></div>
+          <div class="metric"><span class="metric-label">BITRATE</span><span id="bitrateStat" class="metric-value">—</span></div>
+          <div class="metric"><span class="metric-label">VIEWERS</span><span id="viewersStat" class="metric-value">—</span></div>
+          <div class="metric"><span class="metric-label">NETWORK QUEUE</span><span id="queueStat" class="metric-value">—</span></div>
         </div>
       </section>
 
@@ -84,7 +88,7 @@
       </div>
       <p class="privacy"><span aria-hidden="true">◇</span> A private, local viewing experience. Keep the session link to yourself, and use trusted USB or Wi-Fi networks. Audio requires capture consent on Android.</p>
     </main>
-    <footer class="site-footer"><span>POCHI / CREATED FOR THE BIG SCREEN</span><span>MONOCHROME EDITION · 0.4</span></footer>
+    <footer class="site-footer"><span>POCHI / CREATED FOR THE BIG SCREEN</span><span>MONOCHROME EDITION · 0.6</span></footer>
   </div>
 </body>
 </html>
