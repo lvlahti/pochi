@@ -11,6 +11,7 @@ import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.graphics.Color
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.Button
@@ -171,6 +172,10 @@ class MainActivity : Activity() {
 
     private fun renderStatus(message: String, link: String?, active: Boolean) {
         statusText.text = message
+        val isError = message.startsWith("Error:", ignoreCase = true) ||
+            message.contains("declined", ignoreCase = true) ||
+            message.contains("permission is needed", ignoreCase = true)
+        statusText.setTextColor(Color.parseColor(if (isError) "#FF5555" else "#DEDEDE"))
         urlText.text = link.orEmpty()
         startButton.isEnabled = !active
         stopButton.isEnabled = active
