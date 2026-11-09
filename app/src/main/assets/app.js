@@ -11,6 +11,9 @@ const fpsLabel = document.getElementById('fps');
 const delayLabel = document.getElementById('delay');
 const screen = document.getElementById('screen');
 const audioButton = document.getElementById('audioToggle');
+const volumeControl = document.getElementById('volumeControl');
+const volumeSlider = document.getElementById('audioVolume');
+const volumeValue = document.getElementById('volumeValue');
 const audioLabel = document.getElementById('audioStatus');
 const token = new URLSearchParams(location.search).get('token');
 const suffix = '?token=' + encodeURIComponent(token || '');
@@ -27,6 +30,7 @@ let attemptId = 0;
 let audioAvailable = false;
 let audioEnabled = false;
 let audioContext = null;
+let audioGain = null;
 let audioPlayHead = 0;
 
 function showStatus(text, online) {
@@ -110,7 +114,7 @@ function audioSamples(arrayBuffer) {
   for (let i = 0; i < samples; i++) channel[i] = view.getInt16(i * 2, true) / 32768;
   const source = audioContext.createBufferSource();
   source.buffer = sound;
-  source.connect(audioContext.destination);
+  source.connect(audioGain || audioContext.destination);
   const now = audioContext.currentTime;
   if (!audioPlayHead || audioPlayHead < now || audioPlayHead > now + .45) {
     audioPlayHead = now + .14; // keep queue short, drop late audio instead of accumulating lag
@@ -131,14 +135,27 @@ function connectAudio() {
     if (audioSocket === ws) audioSocket = null;
     audioLabel.textContent = audioEnabled ? 'Audio disconnected — reconnect' : 'Audio off';
   };
-  ws.onerror = () => { audioLabel.textContent = 'Audio connection error'; };
+  ws.onerror = () => { audioLabel.textContent = 'Audio unavailable'; showError('Audio connection error. Check the local network.'); };
 }
+
+function updateVolume() {
+  const percent = Math.max(0, Math.min(100, Number(volumeSlider.value) || 0));
+  volumeValue.textContent = percent + '%';
+  volumeSlider.setAttribute('aria-valuetext', percent + '%');
+  if (audioContext && audioGain) {
+    audioGain.gain.setTargetAtTime(percent / 100, audioContext.currentTime, .015);
+  }
+}
+volumeSlider.addEventListener('input', updateVolume);
+updateVolume();
 
 audioButton.addEventListener('click', async () => {
   if (!audioAvailable) return;
   if (audioEnabled) {
     audioEnabled = false;
     audioButton.textContent = 'Enable audio';
+    audioButton.setAttribute('aria-pressed', 'false');
+    volumeControl.hidden = true;
     audioLabel.textContent = 'Audio off';
     if (audioSocket) { audioSocket.close(); audioSocket = null; }
     if (audioContext) await audioContext.suspend();
@@ -150,9 +167,16 @@ audioButton.addEventListener('click', async () => {
       if (!AudioCtx) throw new Error('Web Audio is not supported');
       audioContext = new AudioCtx();
     }
+    if (!audioGain) {
+      audioGain = audioContext.createGain();
+      audioGain.connect(audioContext.destination);
+    }
+    updateVolume();
     await audioContext.resume(); // Browser permits sound only after a user gesture.
     audioEnabled = true;
     audioButton.textContent = 'Mute audio';
+    audioButton.setAttribute('aria-pressed', 'true');
+    volumeControl.hidden = false;
     connectAudio();
   } catch (error) { showError('Cannot enable audio: ' + error.message); }
 });
@@ -170,6 +194,7 @@ async function connect() {
     if (current !== attemptId) return;
     audioAvailable = !!data.audio;
     audioButton.hidden = !audioAvailable;
+    volumeControl.hidden = !audioAvailable || !audioEnabled;
     audioLabel.textContent = audioAvailable ? (audioEnabled ? 'Connecting audio…' : 'Optional internal app audio') : 'Video only';
     if (audioEnabled) connectAudio();
     document.getElementById('transport').textContent = data.transport === 'wifi' ? 'Wi-Fi · local network' : 'USB tethering';

@@ -3,70 +3,70 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
-    android:background="#101622">
+    android:background="#080808">
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:padding="24dp">
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="28dp" android:text="●  POCHI / 0.2"
-            android:textColor="#88E0CA" android:textStyle="bold" android:letterSpacing="0.12" android:textSize="24sp" />
+            android:layout_marginTop="28dp" android:text="●  POCHI / 0.3"
+            android:textColor="#FFFFFF" android:textStyle="bold" android:letterSpacing="0.12" android:textSize="24sp" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="12dp" android:text="Your screen. Your settings."
-            android:textColor="#F0F5FF" android:textStyle="bold" android:textSize="22sp" />
+            android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="22sp" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="8dp" android:text="Stream to a web browser on Windows or any computer. No receiver installation needed."
-            android:textColor="#AEB9D0" android:textSize="14sp" />
+            android:textColor="#A6A6A6" android:textSize="14sp" />
 
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="28dp"
-            android:text="CONNECTION" android:textColor="#88E0CA" android:textStyle="bold" android:letterSpacing="0.08" />
-        <Spinner android:id="@+id/transportSpinner" android:layout_width="match_parent" android:layout_height="48dp" android:backgroundTint="#88E0CA" />
+            android:text="CONNECTION" android:textColor="#FFFFFF" android:textStyle="bold" android:letterSpacing="0.08" />
+        <Spinner android:id="@+id/transportSpinner" android:layout_width="match_parent" android:layout_height="48dp" android:backgroundTint="#FFFFFF" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="USB: enable USB tethering first. Wi-Fi: put both devices on the same trusted network."
-            android:textColor="#AEB9D0" android:textSize="12sp" />
+            android:textColor="#A6A6A6" android:textSize="12sp" />
         <Button android:id="@+id/settingsButton" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="6dp" android:text="Open network settings" android:textAllCaps="false" />
 
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="22dp"
-            android:text="VIDEO ENCODING" android:textColor="#88E0CA" android:textStyle="bold" android:letterSpacing="0.08" />
+            android:text="VIDEO ENCODING" android:textColor="#FFFFFF" android:textStyle="bold" android:letterSpacing="0.08" />
         <Spinner android:id="@+id/modeSpinner" android:layout_width="match_parent" android:layout_height="48dp" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp"
-            android:text="Maximum resolution (longest edge)" android:textColor="#D4DBEB" />
+            android:text="Maximum resolution (longest edge)" android:textColor="#DEDEDE" />
         <Spinner android:id="@+id/resolutionSpinner" android:layout_width="match_parent" android:layout_height="48dp" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp"
-            android:text="Frame rate" android:textColor="#D4DBEB" />
+            android:text="Frame rate" android:textColor="#DEDEDE" />
         <Spinner android:id="@+id/fpsSpinner" android:layout_width="match_parent" android:layout_height="48dp" />
         <TextView android:id="@+id/bitrateLabel" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" android:text="H.264 video bitrate" android:textColor="#D4DBEB" />
+            android:layout_marginTop="10dp" android:text="H.264 video bitrate" android:textColor="#DEDEDE" />
         <Spinner android:id="@+id/bitrateSpinner" android:layout_width="match_parent" android:layout_height="48dp" />
         <TextView android:id="@+id/qualityLabel" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" android:text="JPEG quality" android:textColor="#D4DBEB" android:visibility="gone" />
+            android:layout_marginTop="10dp" android:text="JPEG quality" android:textColor="#DEDEDE" android:visibility="gone" />
         <Spinner android:id="@+id/qualitySpinner" android:layout_width="match_parent" android:layout_height="48dp" android:visibility="gone" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
             android:text="High FPS, resolution and bitrate increase bandwidth and battery use. Actual FPS may be lower than selected."
-            android:textColor="#AEB9D0" android:textSize="12sp" />
+            android:textColor="#A6A6A6" android:textSize="12sp" />
 
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp"
-            android:text="AUDIO" android:textColor="#88E0CA" android:textStyle="bold" android:letterSpacing="0.08" />
+            android:text="AUDIO" android:textColor="#FFFFFF" android:textStyle="bold" android:letterSpacing="0.08" />
         <CheckBox android:id="@+id/audioCheckbox" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:buttonTint="#88E0CA" android:text="Share internal app audio (experimental)" android:textColor="#F0F5FF" />
+            android:buttonTint="#FFFFFF" android:text="Share internal app audio (experimental)" android:textColor="#FFFFFF" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:text="Requires Android 10+ and recording permission. Some apps/DRM block internal audio. On the viewer click Enable audio. This does not capture the microphone."
-            android:textColor="#AEB9D0" android:textSize="12sp" />
+            android:textColor="#A6A6A6" android:textSize="12sp" />
 
         <Button android:id="@+id/startButton" android:layout_width="match_parent" android:layout_height="54dp"
-            android:layout_marginTop="30dp" android:backgroundTint="#88E0CA"
-            android:textColor="#101622" android:textStyle="bold" android:text="Start sharing" android:textAllCaps="false" />
+            android:layout_marginTop="30dp" android:backgroundTint="#FFFFFF"
+            android:textColor="#080808" android:textStyle="bold" android:text="Start sharing" android:textAllCaps="false" />
         <Button android:id="@+id/stopButton" android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="6dp" android:enabled="false" android:text="Stop sharing" android:textAllCaps="false" />
         <TextView android:id="@+id/statusText" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="22dp" android:text="Not sharing" android:textColor="#D4DBEB" android:textSize="15sp" />
+            android:layout_marginTop="22dp" android:text="Not sharing" android:textColor="#DEDEDE" android:textSize="15sp" />
         <TextView android:id="@+id/urlText" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" android:autoLink="web" android:textColor="#88E0CA"
+            android:layout_marginTop="10dp" android:autoLink="web" android:textColor="#FFFFFF"
             android:textIsSelectable="true" android:textSize="17sp" android:textStyle="bold" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
             android:layout_marginTop="22dp" android:text="Screen capture needs your consent each time. Wi-Fi viewers on the same local network can access the stream with the displayed private link. Never share it on untrusted networks."
-            android:textSize="12sp" android:textColor="#8290AC" android:lineSpacingExtra="4dp" />
+            android:textSize="12sp" android:textColor="#8A8A8A" android:lineSpacingExtra="4dp" />
     </LinearLayout>
 </ScrollView>

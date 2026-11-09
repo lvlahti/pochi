@@ -27,6 +27,8 @@ jobs:
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+      - name: Verify browser JavaScript
+        run: node --check app/src/main/assets/app.js
       - name: Test and build APK
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
       - name: Upload APK artifact
@@ -40,8 +42,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Pochi-v0.2-debug.apk
-          gh release create "preview-${{ github.run_number }}" Pochi-v0.2-debug.apk \
-            --title "Pochi v0.2 preview #${{ github.run_number }}" \
-            --notes 'Experimental Android debug APK with USB/Wi-Fi, adjustable video and optional internal audio. Hardware verification is still needed.' \
+          cp app/build/outputs/apk/debug/app-debug.apk Pochi-v0.3-debug.apk
+          gh release create "preview-${{ github.run_number }}" Pochi-v0.3-debug.apk \
+            --title "Pochi v0.3 preview #${{ github.run_number }}" \
+            --notes 'Experimental Android debug APK featuring monochrome Android/browser interfaces and adjustable browser audio volume. Hardware verification is still needed.' \
             --prerelease --latest=false

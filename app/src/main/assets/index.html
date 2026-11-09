@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#101622">
+  <meta name="theme-color" content="#080808">
   <title>Pochi — Screen Mirror</title>
   <link rel="stylesheet" href="/style.css">
   <script src="/app.js" defer></script>
@@ -23,7 +23,14 @@
           <p>USB or Wi-Fi · Local streaming · No receiver software</p>
         </div>
         <div class="toolbar">
-          <button id="audioToggle" type="button" hidden>Enable audio</button>
+          <div class="audio-tools">
+            <button id="audioToggle" type="button" aria-controls="volumeControl" aria-pressed="false" hidden>Enable audio</button>
+            <div id="volumeControl" class="volume-control" role="group" aria-label="Audio volume" hidden>
+              <label for="audioVolume">Volume</label>
+              <input id="audioVolume" type="range" min="0" max="100" step="1" value="100" aria-label="Playback volume">
+              <output id="volumeValue" for="audioVolume">100%</output>
+            </div>
+          </div>
           <button id="reconnect" type="button">↻ Reconnect</button>
           <button id="fullscreen" type="button" class="primary">⛶ Fullscreen</button>
         </div>
@@ -37,7 +44,7 @@
           <strong>Waiting for your screen</strong>
           <small>Check that sharing is active in Pochi on Android.</small>
         </div>
-        <div class="screen-label">POCHI / LIVE SCREEN MIRROR</div>
+        <div class="screen-label">POCHI / LIVE SCREEN MIRROR · V0.3</div>
       </div>
 
       <div class="footer">
