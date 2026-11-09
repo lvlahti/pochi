@@ -12,26 +12,31 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.security.MessageDigest
+import java.security.SecureRandom
 import java.util.Base64
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
-/** Browser-only screen receiver. Listens exclusively on the USB-tether IPv4 address. */
+/** Browser-only receiver bound to the selected local interface; access requires an unguessable URL token. */
 class StreamServer(
     private val context: Context,
     private val address: Inet4Address,
-    private val mode: String,
+    private val settings: StreamSettings,
     private val port: Int = 8822
 ) : AutoCloseable {
-    val url: String = "http://${address.hostAddress}:$port/"
+    private val token: String = ByteArray(16).also { SecureRandom().nextBytes(it) }
+        .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    val url: String = "http://${address.hostAddress}:$port/?token=$token"
     private val running = AtomicBoolean(false)
     private val server = ServerSocket()
     private val websocketClients = CopyOnWriteArrayList<WebsocketClient>()
     private val mjpegClients = CopyOnWriteArrayList<MjpegClient>()
+    private val audioClients = CopyOnWriteArrayList<AudioClient>()
     @Volatile private var initialization: ByteArray? = null
     @Volatile private var mime = ""
+    @Volatile private var audioAvailable = false
 
     fun start() {
         server.reuseAddress = true
@@ -71,15 +76,25 @@ class StreamServer(
             if (method != "GET" || headers["host"] != expectedHost) {
                 respond(output, 403, "text/plain", "Forbidden".toByteArray()); return
             }
-            when (path.substringBefore('?')) {
+            val resource = path.substringBefore('?')
+            val requestToken = path.substringAfter("?token=", "").substringBefore('&')
+            val authorized = requestToken == token
+            if (!authorized && resource != "/app.js" && resource != "/style.css") {
+                respond(output, 403, "text/plain", "Invalid Pochi viewer link".toByteArray()); return
+            }
+            when (resource) {
                 "/" -> serveAsset(output, "index.html", "text/html; charset=utf-8")
                 "/app.js" -> serveAsset(output, "app.js", "text/javascript; charset=utf-8")
                 "/style.css" -> serveAsset(output, "style.css", "text/css; charset=utf-8")
                 "/status" -> respond(output, 200, "application/json", JSONObject().apply {
-                    put("mode", mode)
+                    put("mode", settings.mode)
+                    put("transport", settings.transport)
+                    put("audio", audioAvailable)
+                    put("fps", settings.fps)
+                    put("maxEdge", settings.maxEdge)
                 }.toString().toByteArray())
                 "/ws" -> {
-                    if (mode != CaptureService.MODE_H264 ||
+                    if (settings.mode != StreamSettings.MODE_H264 ||
                         headers["origin"] != "http://$expectedHost" ||
                         headers["upgrade"]?.lowercase() != "websocket" ||
                         headers["sec-websocket-version"] != "13") {
@@ -97,8 +112,24 @@ class StreamServer(
                     websocketClients.remove(client)
                     client.close()
                 }
+                "/audio" -> {
+                    if (!audioAvailable || headers["origin"] != "http://$expectedHost" ||
+                        headers["upgrade"]?.lowercase() != "websocket" ||
+                        headers["sec-websocket-version"] != "13") {
+                        respond(output, 403, "text/plain", "Forbidden".toByteArray()); return
+                    }
+                    val key = headers["sec-websocket-key"] ?: return
+                    if (!handshake(output, key)) return
+                    socket.soTimeout = 0
+                    val client = AudioClient(socket, output)
+                    audioClients.add(client)
+                    client.start()
+                    while (running.get() && input.read() != -1) { /* wait for disconnect */ }
+                    audioClients.remove(client)
+                    client.close()
+                }
                 "/mjpeg" -> {
-                    if (mode != CaptureService.MODE_MJPEG) {
+                    if (settings.mode != StreamSettings.MODE_MJPEG) {
                         respond(output, 404, "text/plain", "Not found".toByteArray()); return
                     }
                     output.write(("HTTP/1.1 200 OK\r\n" +
@@ -175,6 +206,21 @@ class StreamServer(
         websocketClients.forEach { it.offerFragment(fragment) }
     }
 
+    /** A new video geometry needs a fresh MSE init segment on every connected browser. */
+    fun resetVideo() {
+        initialization = null
+        mime = ""
+        websocketClients.forEach { it.close() }
+        websocketClients.clear()
+    }
+
+    /** Send bounded low-latency mono 48 kHz PCM16 chunks (no microphone capture). */
+    fun setAudioAvailable(available: Boolean) { audioAvailable = available }
+
+    fun publishAudio(pcm: ByteArray) {
+        audioClients.forEach { it.offer(pcm) }
+    }
+
     fun publishJpeg(jpeg: ByteArray) {
         mjpegClients.forEach { it.offer(jpeg) }
     }
@@ -184,8 +230,10 @@ class StreamServer(
         runCatching { server.close() }
         websocketClients.forEach { it.close() }
         mjpegClients.forEach { it.close() }
+        audioClients.forEach { it.close() }
         websocketClients.clear()
         mjpegClients.clear()
+        audioClients.clear()
     }
 
     private class WebsocketClient(val socket: Socket, val output: OutputStream) : AutoCloseable {
@@ -240,6 +288,44 @@ class StreamServer(
             }, "Pochi-WS-Writer").start()
         }
 
+        override fun close() {
+            alive.set(false)
+            runCatching { socket.close() }
+        }
+    }
+
+    private class AudioClient(private val socket: Socket, private val output: OutputStream) : AutoCloseable {
+        private val queue = LinkedBlockingDeque<ByteArray>(8)
+        private val alive = AtomicBoolean(true)
+        fun offer(bytes: ByteArray) {
+            if (!queue.offer(bytes)) {
+                queue.clear() // never build a growing audible delay on slow clients
+                queue.offer(bytes)
+            }
+        }
+        fun start() {
+            Thread({
+                try {
+                    while (alive.get()) {
+                        val chunk = queue.poll(1, TimeUnit.SECONDS) ?: continue
+                        val size = chunk.size
+                        output.write(0x82)
+                        if (size < 126) output.write(size)
+                        else if (size <= 65535) {
+                            output.write(126)
+                            output.write((size ushr 8) and 255)
+                            output.write(size and 255)
+                        } else {
+                            output.write(127)
+                            for (shift in 56 downTo 0 step 8) output.write(((size.toLong() ushr shift) and 255).toInt())
+                        }
+                        output.write(chunk)
+                        output.flush()
+                    }
+                } catch (_: Exception) {
+                } finally { close() }
+            }, "Pochi-Audio-WS").start()
+        }
         override fun close() {
             alive.set(false)
             runCatching { socket.close() }

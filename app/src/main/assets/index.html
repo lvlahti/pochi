@@ -18,11 +18,12 @@
     <main>
       <div class="heading">
         <div>
-          <div class="eyebrow">ANDROID → WINDOWS</div>
+          <div class="eyebrow">ANDROID → YOUR BROWSER</div>
           <h1>Your phone, on the big screen.</h1>
-          <p>Direct USB tethering · No internet · No Windows software</p>
+          <p>USB or Wi-Fi · Local streaming · No receiver software</p>
         </div>
         <div class="toolbar">
+          <button id="audioToggle" type="button" hidden>Enable audio</button>
           <button id="reconnect" type="button">↻ Reconnect</button>
           <button id="fullscreen" type="button" class="primary">⛶ Fullscreen</button>
         </div>
@@ -36,15 +37,16 @@
           <strong>Waiting for your screen</strong>
           <small>Check that sharing is active in Pochi on Android.</small>
         </div>
-        <div class="screen-label">POCHI / LIVE USB MIRROR</div>
+        <div class="screen-label">POCHI / LIVE SCREEN MIRROR</div>
       </div>
 
       <div class="footer">
-        <div><span class="green">●</span> <span id="mode">Detecting video mode</span></div>
+        <div><span class="green">●</span> <span id="mode">Detecting video mode</span> <span class="divider">/</span> <span id="transport">Connecting…</span></div>
         <div><span id="fps">— FPS</span> <span class="divider">/</span> <span id="delay">Low-latency stream</span></div>
       </div>
+      <p id="audioStatus" class="audio-status">Video only</p>
       <p id="error" class="error" role="status"></p>
-      <p class="privacy">This stream is local to the USB tether network. Only share your screen with a computer you trust. Stop sharing from Pochi when you're done.</p>
+      <p class="privacy">This stream runs on the selected local USB or Wi-Fi network. Keep your private viewer link secret and use a trusted network. Audio capture requires app support and user consent on Android.</p>
     </main>
   </div>
 </body>

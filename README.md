@@ -1,43 +1,54 @@
-# Pochi
+# Pochi 🐾 — Android screen mirroring over USB or Wi-Fi
 
-Pochi mirrors an **Android screen to a Windows browser with a USB data cable**, using USB tethering for local network communication. No receiver installation, internet, or Wi-Fi is required.
+**Pochi v0.2** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
 
-## Quick start
+## Features
 
-1. Connect your Android phone to Windows using a USB *data* cable.
-2. Enable **USB tethering** on the phone (Settings → Portable hotspot → USB tethering on Xiaomi/MIUI; menu names vary).
-3. Launch **Pochi**, select **Balanced (H.264)** and tap **Start sharing**.
-4. Accept Android's screen-capture permission.
-5. Open the address shown in Pochi in **Chrome** or **Edge** on the PC. (Port 8822.)
-6. Tap **Stop sharing** when finished. If the browser can't play H.264, stop and restart in **Compatibility (MJPEG)** mode.
+- **USB or Wi-Fi transport:** The sender listens only on the selected Android interface. For USB, plug in a data cable and turn on USB tethering. For Wi-Fi, connect sender and viewer to the *same trusted local Wi-Fi network*.
+- **Portrait ↔ landscape:** The existing Android VirtualDisplay is resized on phone rotation without requesting screen capture a second time. In H.264 mode, the browser automatically reconnects to a fresh video stream.
+- **Custom settings:** 640/960/1280/1600/1920 maximum long edge; 15/24/30/60 FPS; H.264 bitrate from 750 to 10000 kbps; MJPEG quality 40–95%. Actual frame rates depend on phone hardware.
+- **H.264 video:** Hardware AVC encoder → fragmented MP4 → WebSocket → browser MediaSource. Use Chrome or Edge for best support.
+- **MJPEG video:** Alternate compatibility mode using JPEG over HTTP.
+- **Optional experimental internal audio:** Android 10+ `AudioPlaybackCapture` captures audio from *participating* media/game apps (not the mic). Uncompressed 48 kHz mono PCM16 travels over a separate WebSocket and is played by browser Web Audio when you click **Enable audio**.
+- **Local viewer authorization:** Each share session creates a random 128-bit token in its browser URL; accessing the screen, audio, or status without the token is refused.
 
-## Design
+## Setup
 
-- **Native Kotlin Android**, no third-party runtime libraries.
-- **Balanced**: MediaProjection → hardware MediaCodec AVC encoder → fragmented ISO BMFF/MP4 (MSE) via WebSocket → HTML5 video in Windows browser. Target ~24 FPS; max long dimension 1280px; ~2.5 Mbps.
-- **Compatibility**: MediaProjection → ImageReader → JPEG → multipart MJPEG browser stream. Target ~10 FPS, more CPU/bandwidth.
-- Embedded HTTP server listens **only on Android's USB tethering IPv4 interface** (`rndis*`, `usb*`, `ncm*`). On phones that use other interface names, update `UsbNetwork.kt` and rebuild.
-- No cloud, storage, Wi-Fi, root, PC software, or permanent screen-recording permission. A foreground notification is visible during capture.
+1. Install the Android APK on your phone (Android 8+). For optional internal audio, use Android 10+.
+2. On the phone open Pochi and select your **connection**:
+   - **USB:** Connect a data-capable cable to the viewer and enable Android **USB tethering**.
+   - **Wi-Fi:** Make sure both devices are on the same **Wi-Fi** network, with no client isolation. Do not use mobile data alone.
+3. Choose **H.264** or **MJPEG**, resolution, FPS, and relevant bitrate/quality. Optionally enable **Internal audio** and grant Android's recording permission.
+4. Tap **Start sharing**, approve Android's screen capture dialog, and copy the **entire URL including `?token=...`**.
+5. Open that URL in Chrome or Edge on the computer. For sound, click **Enable audio** in the viewer. Browser sound autoplay requires this user interaction.
+6. Rotate the phone if desired. H.264 viewers should reconnect automatically. Stop sharing from Pochi when finished.
 
-**Limitations:** video only (no audio), no touch/keyboard control of Android, DRM video may be black. This is an **experimental prototype**; hardware H.264 paths need testing on the actual Redmi Note 12 Pro 5G. A regular USB-C→HDMI adapter is not made functional by this app.
+## Performance notes
 
-## Build APK
+- Defaults: 1280 max edge, 24 FPS, 2.5 Mbps H.264 video. Larger output, more frames and higher bitrates consume more CPU, battery and bandwidth.
+- Internal audio is uncompressed mono PCM16 (approximately 0.77 Mbps). Sound and picture use **independent transport streams**. This is **experimental** and some audio/video sync skew is possible.
+- This is a **local HTTP application**. The random token blocks casual access, **but local network traffic is not encrypted**. Only use trusted USB and Wi-Fi networks; anyone who intercepts the link or network traffic can access your stream.
+- Protected video and audio (DRM, apps prohibiting capture, calls, microphone, system notification sounds) might be absent or black/silent.
+- On Android 14+ select **Entire screen** for best rotation coverage; capturing one specific app may have different aspect ratio behavior.
+- This app does **not** activate USB-C DisplayPort Alt Mode or a passive USB-C/HDMI adapter.
 
-**Option A — GitHub Actions:** Upload this project to `lvlahti/pochi`, open **Actions → Build Android APK → Run workflow**, then download the `pochi-debug-apk` artifact after it succeeds.
+## Build
 
-**Option B — Android Studio:** Open project using JDK 17 and Android SDK 35. Sync Gradle and choose **Build → Build APK(s)**. Command-line build uses **Gradle 8.11.1** (`gradle :app:assembleDebug`); Android Gradle Plugin 8.9.2, Kotlin 2.1.20.
+GitHub Actions → **Build Android APK** runs `:app:testDebugUnitTest` and `:app:assembleDebug` (Gradle 8.11.1, Android Gradle Plugin 8.9.2, Kotlin 2.1.20, Android 35). Successful pushes to `main` publish a **preview GitHub Release APK** and the workflow artifact contains the debug APK. You can also open this project in Android Studio with JDK 17.
 
-The project omits Gradle wrapper binaries (as they are binary artifacts); GitHub Actions installs Gradle automatically. Build prerequisites are downloaded by Gradle/Android Studio.
-
-## Security and privacy
-
-Only start sharing with a trusted PC connected over USB. Everyone with access to the local USB tether link and the URL can view the unencrypted stream while capture is on. There is no authentication or encryption on that local link. There is no external network upload. The user must consent to each Android screen-capture session.
+Debug builds are signed with Android's debug key (not intended as production-signed releases). Uninstall earlier APKs if they were signed with a different key.
 
 ## Troubleshooting
 
-- **No URL:** enable USB tethering *before* launching capture; confirm the Windows USB Ethernet adapter appears, then restart sharing.
-- **Can't open address:** make sure the Windows PC is connected to the tether network, Chrome/Edge uses the URL shown on the phone (not `localhost`).
-- **Playback stalls:** stop capture, switch to **Compatibility**, and grant capture consent again.
-- **USB tethering requires mobile data:** some ROMs restrict the toggle; Pochi doesn't need internet, but it cannot bypass OS tethering restrictions.
+- **No USB address:** Enable USB tethering after connecting the USB data cable and verify that Windows sees a new USB Ethernet/RNDIS connection.
+- **No Wi-Fi address:** Connect phone and viewer to the same Wi-Fi (not just cellular data). The Wi-Fi must permit device-to-device traffic; guest Wi-Fi and AP isolation often block it.
+- **403 Forbidden:** Use the **full new session URL** containing `?token=...` from the app; old links stop working when you restart capture.
+- **No sound:** Select Internal audio on Android before starting; grant recording permission; click Enable audio in the viewer. Some apps do not allow audio playback capture and remain silent.
+- **Video stutters:** Lower resolution to 960, FPS to 24, and bitrate to 1500 kbps. MJPEG will use more CPU/bandwidth than H.264.
+- **H.264 black picture after rotation:** Wait for automatic reconnect. If needed click Reconnect, or switch to MJPEG mode.
 
-License: MIT.
+## Status
+
+**v0.2 preview — CI build and unit tests; device-specific rotation/audio/Wi-Fi behavior should be tested on physical phones.** See `QUICKSTART-fa.md` for the Persian guide.
+
+MIT License.

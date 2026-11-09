@@ -10,17 +10,24 @@ const modeLabel = document.getElementById('mode');
 const fpsLabel = document.getElementById('fps');
 const delayLabel = document.getElementById('delay');
 const screen = document.getElementById('screen');
+const audioButton = document.getElementById('audioToggle');
+const audioLabel = document.getElementById('audioStatus');
+const token = new URLSearchParams(location.search).get('token');
+const suffix = '?token=' + encodeURIComponent(token || '');
 let socket = null;
+let audioSocket = null;
 let media = null;
 let buffer = null;
 let objectUrl = null;
 let chunks = [];
-let active = false;
-let connecting = false;
 let retryTimer = null;
 let renderedFrames = 0;
 let lastFpsTime = performance.now();
 let attemptId = 0;
+let audioAvailable = false;
+let audioEnabled = false;
+let audioContext = null;
+let audioPlayHead = 0;
 
 function showStatus(text, online) {
   state.textContent = text;
@@ -33,6 +40,7 @@ function closeStream() {
   attemptId++;
   clearTimeout(retryTimer);
   if (socket) { const old = socket; socket = null; old.onclose = null; old.close(); }
+  if (audioSocket) { const old = audioSocket; audioSocket = null; old.onclose = null; old.close(); }
   if (buffer && media && media.readyState === 'open') {
     try { media.endOfStream(); } catch (_) { /* may be updating */ }
   }
@@ -47,8 +55,7 @@ function closeStream() {
   jpeg.hidden = true;
   video.hidden = false;
   placeholder.hidden = false;
-  active = false;
-  connecting = false;
+  audioPlayHead = 0;
 }
 
 function pump() {
@@ -74,7 +81,7 @@ function pump() {
 
 function configureMse(mime) {
   if (!window.MediaSource || !MediaSource.isTypeSupported(mime)) {
-    showError('Your browser cannot play this H.264 format. Use Chrome or Edge, or restart Pochi in Compatibility (MJPEG) mode.');
+    showError('Browser does not support this H.264 codec. Use Chrome/Edge or MJPEG mode.');
     return;
   }
   chunks = [];
@@ -87,72 +94,130 @@ function configureMse(mime) {
       buffer = media.addSourceBuffer(mime);
       buffer.mode = 'segments';
       buffer.addEventListener('updateend', () => { showPicture(); pump(); });
-      buffer.addEventListener('error', () => showError('H.264 playback failed. Switch to Compatibility (MJPEG) mode.'));
+      buffer.addEventListener('error', () => showError('H.264 playback failed. Try MJPEG mode.'));
       pump();
     } catch (err) { showError('Cannot initialize video: ' + err.message); }
   }, { once: true });
 }
+
+function audioSamples(arrayBuffer) {
+  if (!audioContext || audioContext.state !== 'running' || !audioEnabled) return;
+  const view = new DataView(arrayBuffer);
+  const samples = Math.floor(view.byteLength / 2);
+  if (!samples) return;
+  const sound = audioContext.createBuffer(1, samples, 48000);
+  const channel = sound.getChannelData(0);
+  for (let i = 0; i < samples; i++) channel[i] = view.getInt16(i * 2, true) / 32768;
+  const source = audioContext.createBufferSource();
+  source.buffer = sound;
+  source.connect(audioContext.destination);
+  const now = audioContext.currentTime;
+  if (!audioPlayHead || audioPlayHead < now || audioPlayHead > now + .45) {
+    audioPlayHead = now + .14; // keep queue short, drop late audio instead of accumulating lag
+  }
+  source.start(audioPlayHead);
+  audioPlayHead += sound.duration;
+}
+
+function connectAudio() {
+  if (!audioAvailable || !audioEnabled || !audioContext || audioSocket) return;
+  const ws = new WebSocket('ws://' + location.host + '/audio' + suffix);
+  ws.binaryType = 'arraybuffer';
+  audioSocket = ws;
+  audioLabel.textContent = 'Connecting audio…';
+  ws.onopen = () => { audioLabel.textContent = 'Internal audio on'; audioPlayHead = 0; };
+  ws.onmessage = event => { if (event.data instanceof ArrayBuffer) audioSamples(event.data); };
+  ws.onclose = () => {
+    if (audioSocket === ws) audioSocket = null;
+    audioLabel.textContent = audioEnabled ? 'Audio disconnected — reconnect' : 'Audio off';
+  };
+  ws.onerror = () => { audioLabel.textContent = 'Audio connection error'; };
+}
+
+audioButton.addEventListener('click', async () => {
+  if (!audioAvailable) return;
+  if (audioEnabled) {
+    audioEnabled = false;
+    audioButton.textContent = 'Enable audio';
+    audioLabel.textContent = 'Audio off';
+    if (audioSocket) { audioSocket.close(); audioSocket = null; }
+    if (audioContext) await audioContext.suspend();
+    return;
+  }
+  try {
+    if (!audioContext) {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) throw new Error('Web Audio is not supported');
+      audioContext = new AudioCtx();
+    }
+    await audioContext.resume(); // Browser permits sound only after a user gesture.
+    audioEnabled = true;
+    audioButton.textContent = 'Mute audio';
+    connectAudio();
+  } catch (error) { showError('Cannot enable audio: ' + error.message); }
+});
 
 async function connect() {
   closeStream();
   const current = attemptId;
   showStatus('Connecting…', false);
   showError('');
-  connecting = true;
   try {
-    const response = await fetch('/status', { cache: 'no-store' });
-    if (!response.ok || current !== attemptId) return;
+    const response = await fetch('/status' + suffix, { cache: 'no-store' });
+    if (current !== attemptId) return;
+    if (!response.ok) throw new Error('Invalid viewer link or sharing has stopped');
     const data = await response.json();
     if (current !== attemptId) return;
+    audioAvailable = !!data.audio;
+    audioButton.hidden = !audioAvailable;
+    audioLabel.textContent = audioAvailable ? (audioEnabled ? 'Connecting audio…' : 'Optional internal app audio') : 'Video only';
+    if (audioEnabled) connectAudio();
+    document.getElementById('transport').textContent = data.transport === 'wifi' ? 'Wi-Fi · local network' : 'USB tethering';
     if (data.mode === 'mjpeg') {
-      modeLabel.textContent = 'Compatibility · MJPEG';
+      modeLabel.textContent = 'Compatibility · MJPEG · up to ' + data.fps + ' FPS';
       video.hidden = true;
       jpeg.hidden = false;
       jpeg.onload = () => { showPicture(); showStatus('Connected', true); };
-      jpeg.onerror = () => showError('JPEG stream interrupted. Retry or restart sharing on Android.');
-      jpeg.src = '/mjpeg?nonce=' + Date.now();
+      jpeg.onerror = () => { showError('MJPEG interrupted. Reconnecting…'); retryTimer = setTimeout(connect, 1300); };
+      jpeg.src = '/mjpeg' + suffix;
       showStatus('Receiving MJPEG…', true);
       fpsLabel.textContent = 'MJPEG';
       return;
     }
-    modeLabel.textContent = 'Balanced · H.264';
-    const ws = new WebSocket('ws://' + location.host + '/ws');
+    modeLabel.textContent = 'H.264 · up to ' + data.fps + ' FPS';
+    const ws = new WebSocket('ws://' + location.host + '/ws' + suffix);
     socket = ws;
     ws.binaryType = 'arraybuffer';
-    ws.onopen = () => { showStatus('Receiving H.264…', true); connecting = false; };
-    ws.onmessage = (evt) => {
-      if (typeof evt.data === 'string') {
+    ws.onopen = () => showStatus('Receiving H.264…', true);
+    ws.onmessage = event => {
+      if (typeof event.data === 'string') {
         try {
-          const info = JSON.parse(evt.data);
+          const info = JSON.parse(event.data);
           if (info.type === 'init') configureMse(info.mime);
-        } catch (err) { showError('Invalid video configuration: ' + err.message); }
+        } catch (error) { showError('Invalid video configuration: ' + error.message); }
       } else if (buffer || media) {
-        // Init segment arrives before media fragments; preserve arrival order.
         if (chunks.length >= 100) chunks.splice(0, chunks.length - 50);
-        chunks.push(evt.data);
+        chunks.push(event.data);
         pump();
       }
     };
-    ws.onerror = () => showError('USB stream interrupted. Check the cable and sharing status.');
+    ws.onerror = () => showError('Video connection interrupted. Check your local network.');
     ws.onclose = () => {
       if (current !== attemptId) return;
-      showStatus('Disconnected', false);
-      retryTimer = setTimeout(connect, 2000);
+      showStatus('Reconnecting…', false);
+      retryTimer = setTimeout(connect, 1100);
     };
-  } catch (err) {
+  } catch (error) {
     if (current !== attemptId) return;
     showStatus('Disconnected', false);
-    showError('Cannot reach Pochi. Check USB tethering. ' + err.message);
-    retryTimer = setTimeout(connect, 2000);
-  } finally { connecting = false; }
+    showError('Cannot reach Pochi: ' + error.message);
+    retryTimer = setTimeout(connect, 1800);
+  }
 }
 
-video.addEventListener('error', () => showError('H.264 decoder error. Restart capture in Compatibility (MJPEG) mode.'));
+video.addEventListener('error', () => showError('H.264 decoder error. Try MJPEG or lower resolution.'));
 video.addEventListener('playing', () => { showPicture(); showStatus('Live', true); });
-function countFrames() {
-  renderedFrames++;
-  video.requestVideoFrameCallback(countFrames);
-}
+function countFrames() { renderedFrames++; video.requestVideoFrameCallback(countFrames); }
 if (video.requestVideoFrameCallback) video.requestVideoFrameCallback(countFrames);
 setInterval(() => {
   if (!jpeg.hidden) return;

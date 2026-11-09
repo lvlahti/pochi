@@ -44,3 +44,7 @@ button.primary:hover { background: #abeedd; }
   .footer { flex-wrap: wrap; }
 }
 .placeholder[hidden] { display: none; }
+
+.audio-status { margin: 0 0 12px; color: #88e0ca; font-size: 12px; }
+.toolbar { flex-wrap: wrap; }
+button[hidden] { display: none; }

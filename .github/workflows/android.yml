@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build and publish Pochi APK
 on:
   push:
     branches: [main]
@@ -7,7 +7,7 @@ on:
 permissions:
   contents: write
 jobs:
-  build:
+  android:
     runs-on: ubuntu-latest
     env:
       ANDROID_HOME: /usr/local/lib/android/sdk
@@ -27,21 +27,21 @@ jobs:
           test -n "$SDKMANAGER"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
-      - name: Unit tests and debug APK
+      - name: Test and build APK
         run: gradle --no-daemon :app:testDebugUnitTest :app:assembleDebug
-      - name: Upload debug APK
+      - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
           name: pochi-debug-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-      - name: Publish downloadable preview APK
+      - name: Publish preview APK on GitHub Releases
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk Pochi-v0.1-debug.apk
-          gh release create "preview-${{ github.run_number }}" Pochi-v0.1-debug.apk \
-            --title "Pochi v0.1 preview #${{ github.run_number }}" \
-            --notes 'Experimental Android debug APK. Screen capture is video-only; use USB tethering and Chrome/Edge. Not yet verified on Redmi Note 12 Pro 5G.' \
+          cp app/build/outputs/apk/debug/app-debug.apk Pochi-v0.2-debug.apk
+          gh release create "preview-${{ github.run_number }}" Pochi-v0.2-debug.apk \
+            --title "Pochi v0.2 preview #${{ github.run_number }}" \
+            --notes 'Experimental Android debug APK with USB/Wi-Fi, adjustable video and optional internal audio. Hardware verification is still needed.' \
             --prerelease --latest=false

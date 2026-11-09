@@ -1,16 +1,24 @@
 package io.github.lvlahti.pochi
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
+import android.graphics.Point
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
+import android.media.AudioAttributes
+import android.media.AudioFormat
+import android.media.AudioPlaybackCaptureConfiguration
+import android.media.AudioRecord
 import android.media.ImageReader
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
@@ -24,114 +32,193 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.view.Display
 import android.view.Surface
 import java.io.ByteArrayOutputStream
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-/** Android's one-use MediaProjection authorization is consumed only after the FGS starts. */
+/** One MediaProjection consent creates ONE VirtualDisplay, resized on rotation without reusing the token. */
 class CaptureService : Service() {
     private var server: StreamServer? = null
     private var projection: MediaProjection? = null
-    private var display: VirtualDisplay? = null
+    private var virtualDisplay: VirtualDisplay? = null
     private var codec: MediaCodec? = null
     private var codecSurface: Surface? = null
     private var imageReader: ImageReader? = null
     private var imageThread: HandlerThread? = null
     private var drainThread: Thread? = null
+    private var audioRecord: AudioRecord? = null
+    private var audioThread: Thread? = null
+    private lateinit var displayManager: DisplayManager
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private lateinit var settings: StreamSettings
+    private var currentGeometry: Geometry? = null
+    @Volatile private var videoGeneration = 0
     @Volatile private var stopping = false
+    @Volatile private var audioRunning = false
+
+    private data class Geometry(val width: Int, val height: Int, val dpi: Int)
+
+    private val displayListener = object : DisplayManager.DisplayListener {
+        override fun onDisplayAdded(displayId: Int) = Unit
+        override fun onDisplayRemoved(displayId: Int) = Unit
+        override fun onDisplayChanged(displayId: Int) {
+            if (displayId == Display.DEFAULT_DISPLAY) requestResize()
+        }
+    }
+    private val resizeRunnable = Runnable {
+        if (stopping || projection == null || virtualDisplay == null) return@Runnable
+        val next = captureSize(settings.maxEdge)
+        val previous = currentGeometry
+        if (previous != null && (next.width != previous.width || next.height != previous.height)) {
+            try {
+                Log.i(TAG, "Screen rotation: ${previous.width}x${previous.height} -> ${next.width}x${next.height}")
+                rebuildVideo(next)
+            } catch (error: Exception) {
+                Log.e(TAG, "Failed to resize capture", error)
+                notifyStatus("Error: rotation resize failed: ${error.message}", null, false)
+                stopSelf()
+            }
+        }
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        requestResize()
+    }
+
+    private fun requestResize() {
+        mainHandler.removeCallbacks(resizeRunnable)
+        mainHandler.postDelayed(resizeRunnable, 350)
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            ACTION_STOP -> {
-                stopSelf()
-                return START_NOT_STICKY
-            }
+            ACTION_STOP -> { stopSelf(); return START_NOT_STICKY }
             ACTION_START -> {
                 if (running) return START_NOT_STICKY
                 running = true
                 stopping = false
-                val mode = intent.getStringExtra(EXTRA_MODE) ?: MODE_H264
+                settings = StreamSettings.from(intent)
                 try {
                     startForegroundNotification()
-                    val usb = UsbNetwork.findAddress()
-                        ?: error("No USB tether network found. Enable USB tethering first.")
-                    server = StreamServer(this, usb, mode).also { it.start() }
-                    val code = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
+                    val ip = LocalNetwork.findAddress(this, settings.transport)
+                        ?: error(if (settings.transport == StreamSettings.TRANSPORT_WIFI)
+                            "Wi-Fi IPv4 not found. Connect both devices to one Wi-Fi network."
+                            else "USB tethering not found. Connect a data cable and enable USB tethering.")
+                    server = StreamServer(this, ip, settings).also { it.start() }
+                    val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, 0)
                     @Suppress("DEPRECATION")
-                    val data = intent.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
-                        ?: error("Missing screen-capture consent")
+                    val resultData = intent.getParcelableExtra<Intent>(EXTRA_RESULT_DATA)
+                        ?: error("Missing screen-capture permission")
                     val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-                    projection = manager.getMediaProjection(code, data)
+                    val mediaProjection = manager.getMediaProjection(resultCode, resultData)
                         ?: error("Android denied screen capture")
-                    projection!!.registerCallback(object : MediaProjection.Callback() {
+                    projection = mediaProjection
+                    mediaProjection.registerCallback(object : MediaProjection.Callback() {
                         override fun onStop() {
-                            if (!stopping) Handler(Looper.getMainLooper()).post { stopSelf() }
+                            if (!stopping) mainHandler.post { stopSelf() }
                         }
-                    }, Handler(Looper.getMainLooper()))
-
-                    val (width, height, dpi) = captureSize(if (mode == MODE_H264) 1280 else 960)
-                    if (mode == MODE_MJPEG) startMjpeg(width, height, dpi)
-                    else startH264(width, height, dpi)
-                    notifyStatus("Sharing (${if (mode == MODE_H264) "H.264" else "MJPEG"}) — open this URL on Windows", server?.url, true)
-                } catch (e: Exception) {
-                    Log.e(TAG, "Cannot start capture", e)
-                    notifyStatus("Error: ${e.message ?: "capture could not start"}", null, false)
+                    }, mainHandler)
+                    displayManager = getSystemService(DISPLAY_SERVICE) as DisplayManager
+                    buildVideo(captureSize(settings.maxEdge))
+                    displayManager.registerDisplayListener(displayListener, mainHandler)
+                    if (settings.audio) startInternalAudio()
+                    notifyStatus("Sharing ${settings.transport.uppercase()} (${settings.mode.uppercase()}, ${settings.fps} FPS${if (audioRunning) ", audio on" else ""})", server?.url, true)
+                } catch (error: Exception) {
+                    Log.e(TAG, "Capture could not start", error)
+                    notifyStatus("Error: ${error.message ?: "could not start"}", null, false)
                     stopSelf()
                 }
             }
         }
-        return START_NOT_STICKY // never restart with a stale MediaProjection token
+        return START_NOT_STICKY
     }
 
     private fun startForegroundNotification() {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Pochi sharing",
-            NotificationManager.IMPORTANCE_LOW))
-        val openApp = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java),
+        manager.createNotificationChannel(NotificationChannel(CHANNEL_ID, "Pochi sharing", NotificationManager.IMPORTANCE_LOW))
+        val launch = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val stopIntent = Intent(this, CaptureService::class.java).apply { action = ACTION_STOP }
-        val stopAction = PendingIntent.getService(this, 1, stopIntent,
+        val stop = PendingIntent.getService(this, 1,
+            Intent(this, CaptureService::class.java).apply { action = ACTION_STOP },
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val notification = Notification.Builder(this, CHANNEL_ID)
             .setContentTitle("Pochi is sharing your screen")
             .setContentText("Tap to open Pochi and stop sharing")
             .setSmallIcon(android.R.drawable.ic_menu_view)
-            .setOngoing(true)
-            .setContentIntent(openApp)
-            .addAction(Notification.Action.Builder(null, "Stop", stopAction).build())
+            .setOngoing(true).setContentIntent(launch)
+            .addAction(Notification.Action.Builder(null, "Stop", stop).build())
             .build()
-        if (Build.VERSION.SDK_INT >= 29) {
-            startForeground(NOTIFICATION_ID, notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+        if (Build.VERSION.SDK_INT >= 29) startForeground(NOTIFICATION_ID, notification,
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+        else { @Suppress("DEPRECATION") startForeground(NOTIFICATION_ID, notification) }
+    }
+
+    private fun captureSize(limit: Int): Geometry {
+        val screen = Point()
+        val actual = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
+        @Suppress("DEPRECATION")
+        actual?.getRealSize(screen)
+        val w = screen.x.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+        val h = screen.y.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+        val scale = (limit.toFloat() / max(w, h)).coerceAtMost(1f)
+        fun aligned(value: Int) = (((value * scale).roundToInt() + 15) / 16 * 16).coerceAtLeast(16)
+        return Geometry(aligned(w), aligned(h), resources.displayMetrics.densityDpi.coerceAtLeast(1))
+    }
+
+    private fun buildVideo(geometry: Geometry) {
+        currentGeometry = geometry
+        if (settings.mode == StreamSettings.MODE_MJPEG) startMjpeg(geometry)
+        else startH264(geometry)
+    }
+
+    /** MediaProjection#createVirtualDisplay is invoked only on first start, never on rotation. */
+    private fun attachSurface(geometry: Geometry, surface: Surface) {
+        val projection = projection ?: error("MediaProjection stopped")
+        if (virtualDisplay == null) {
+            virtualDisplay = projection.createVirtualDisplay("Pochi", geometry.width, geometry.height,
+                geometry.dpi, DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, surface, null, null)
         } else {
-            @Suppress("DEPRECATION")
-            startForeground(NOTIFICATION_ID, notification)
+            virtualDisplay!!.resize(geometry.width, geometry.height, geometry.dpi)
+            virtualDisplay!!.setSurface(surface)
         }
     }
 
-    private fun captureSize(limit: Int): Triple<Int, Int, Int> {
-        val metrics = resources.displayMetrics
-        val scale = (limit.toFloat() / max(metrics.widthPixels, metrics.heightPixels))
-            .coerceAtMost(1f)
-        // Surface-input video encoders on older phones often prefer 16-aligned dimensions.
-        val width = (((metrics.widthPixels * scale).roundToInt() + 15) / 16) * 16
-        val height = (((metrics.heightPixels * scale).roundToInt() + 15) / 16) * 16
-        return Triple(width.coerceAtLeast(16), height.coerceAtLeast(16),
-            (metrics.densityDpi * scale).roundToInt().coerceAtLeast(1))
+    private fun rebuildVideo(geometry: Geometry) {
+        if (settings.mode == StreamSettings.MODE_H264) server?.resetVideo()
+        virtualDisplay?.setSurface(null)
+        stopVideoPipeline()
+        buildVideo(geometry)
     }
 
-    private fun startH264(width: Int, height: Int, dpi: Int) {
+    private fun stopVideoPipeline() {
+        videoGeneration++
+        drainThread?.join(500)
+        drainThread = null
+        runCatching { codec?.stop() }
+        runCatching { codec?.release() }
+        codec = null
+        runCatching { codecSurface?.release() }
+        codecSurface = null
+        runCatching { imageReader?.close() }
+        imageReader = null
+        runCatching { imageThread?.quitSafely() }
+        imageThread = null
+    }
+
+    private fun startH264(geometry: Geometry) {
+        val (width, height) = geometry
+        val rate = settings.fps
         val format = MediaFormat.createVideoFormat(MediaFormat.MIMETYPE_VIDEO_AVC, width, height).apply {
-            setInteger(MediaFormat.KEY_COLOR_FORMAT,
-                MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
-            setInteger(MediaFormat.KEY_BIT_RATE, 2_500_000)
-            setInteger(MediaFormat.KEY_FRAME_RATE, 24)
+            setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+            setInteger(MediaFormat.KEY_BIT_RATE, settings.bitrateKbps * 1000)
+            setInteger(MediaFormat.KEY_FRAME_RATE, rate)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-            setInteger(MediaFormat.KEY_BITRATE_MODE,
-                MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
+            setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)
             if (Build.VERSION.SDK_INT >= 29) setInteger(MediaFormat.KEY_MAX_B_FRAMES, 0)
         }
         val encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_VIDEO_AVC)
@@ -140,39 +227,38 @@ class CaptureService : Service() {
         val surface = encoder.createInputSurface()
         codecSurface = surface
         encoder.start()
-        display = projection!!.createVirtualDisplay("Pochi H.264", width, height, dpi,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, surface, null, null)
-        drainThread = Thread({ drainEncoder(encoder, width, height) }, "Pochi-H264").also { it.start() }
+        attachSurface(geometry, surface)
+        val generation = ++videoGeneration
+        drainThread = Thread({ drainEncoder(encoder, width, height, rate, generation) }, "Pochi-H264")
+            .also { it.start() }
     }
 
-    private fun drainEncoder(encoder: MediaCodec, width: Int, height: Int) {
+    private fun drainEncoder(encoder: MediaCodec, width: Int, height: Int, fps: Int, generation: Int) {
         val info = MediaCodec.BufferInfo()
         var muxer: H264Mp4Muxer? = null
         try {
-            while (!stopping) {
+            while (!stopping && generation == videoGeneration) {
                 when (val slot = encoder.dequeueOutputBuffer(info, 20_000)) {
                     MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                        val output = encoder.outputFormat
-                        fun getNal(name: String, type: Int): ByteArray? {
-                            val buffer = output.getByteBuffer(name) ?: return null
-                            val bytes = ByteArray(buffer.remaining()).also { buffer.get(it) }
+                        val format = encoder.outputFormat
+                        fun nal(key: String, type: Int): ByteArray? {
+                            val data = format.getByteBuffer(key) ?: return null
+                            val bytes = ByteArray(data.remaining()).also { data.get(it) }
                             return AvcNal.split(bytes).firstOrNull { it.isNotEmpty() && (it[0].toInt() and 31) == type }
                         }
-                        val sps = getNal("csd-0", 7) ?: error("Encoder did not provide SPS")
-                        val pps = getNal("csd-1", 8) ?: error("Encoder did not provide PPS")
-                        muxer = H264Mp4Muxer(width, height, sps, pps)
-                        server?.setH264Init(
-                            "video/mp4; codecs=\"${muxer.codecString}\"", muxer.initSegment())
+                        val sps = nal("csd-0", 7) ?: error("H.264 encoder omitted SPS")
+                        val pps = nal("csd-1", 8) ?: error("H.264 encoder omitted PPS")
+                        muxer = H264Mp4Muxer(width, height, sps, pps, fps)
+                        server?.setH264Init("video/mp4; codecs=\"${muxer.codecString}\"", muxer.initSegment())
                     }
                     in 0..Int.MAX_VALUE -> {
                         val buffer = encoder.getOutputBuffer(slot)
-                        if (buffer != null && info.size > 0 &&
-                            info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
+                        if (buffer != null && info.size > 0 && info.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG == 0) {
                             buffer.position(info.offset)
                             buffer.limit(info.offset + info.size)
-                            val bytes = ByteArray(info.size)
-                            buffer.get(bytes)
-                            muxer?.offerFrame(bytes, info.presentationTimeUs,
+                            val frame = ByteArray(info.size)
+                            buffer.get(frame)
+                            muxer?.offerFrame(frame, info.presentationTimeUs,
                                 info.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME != 0)
                                 ?.forEach { server?.publishFragment(it) }
                         }
@@ -181,50 +267,98 @@ class CaptureService : Service() {
                     }
                 }
             }
-        } catch (e: Exception) {
-            if (!stopping) {
-                Log.e(TAG, "H.264 encoding failed", e)
-                Handler(Looper.getMainLooper()).post {
-                    notifyStatus("Error: H.264 encoder failed. Try MJPEG mode.", null, false)
+        } catch (error: Exception) {
+            if (!stopping && generation == videoGeneration) {
+                Log.e(TAG, "H.264 encoder failed", error)
+                mainHandler.post {
+                    notifyStatus("Error: H.264 encoding failed. Try MJPEG or lower settings.", null, false)
                     stopSelf()
                 }
             }
         } finally {
-            muxer?.finish()?.let { server?.publishFragment(it) }
+            if (generation == videoGeneration) muxer?.finish()?.let { server?.publishFragment(it) }
         }
     }
 
-    private fun startMjpeg(width: Int, height: Int, dpi: Int) {
+    private fun startMjpeg(geometry: Geometry) {
+        val (width, height) = geometry
         val reader = ImageReader.newInstance(width, height, PixelFormat.RGBA_8888, 2)
         imageReader = reader
         val thread = HandlerThread("Pochi-MJPEG").also { it.start() }
         imageThread = thread
+        val generation = ++videoGeneration
         var lastFrameAt = 0L
+        val minInterval = 1000L / settings.fps
         reader.setOnImageAvailableListener({ source ->
-            val image = source.acquireLatestImage() ?: return@setOnImageAvailableListener
+            val frame = source.acquireLatestImage() ?: return@setOnImageAvailableListener
             try {
                 val now = SystemClock.elapsedRealtime()
-                if (now - lastFrameAt < 100) return@setOnImageAvailableListener
+                if (stopping || generation != videoGeneration || now - lastFrameAt < minInterval)
+                    return@setOnImageAvailableListener
                 lastFrameAt = now
-                val plane = image.planes.firstOrNull() ?: return@setOnImageAvailableListener
+                val plane = frame.planes.firstOrNull() ?: return@setOnImageAvailableListener
                 val buffer = plane.buffer
                 val paddedWidth = width + (plane.rowStride - width * plane.pixelStride) / plane.pixelStride
-                val rawBitmap = Bitmap.createBitmap(paddedWidth, height, Bitmap.Config.ARGB_8888)
-                rawBitmap.copyPixelsFromBuffer(buffer)
-                val cropped = Bitmap.createBitmap(rawBitmap, 0, 0, width, height)
-                val out = ByteArrayOutputStream()
-                cropped.compress(Bitmap.CompressFormat.JPEG, 70, out)
-                server?.publishJpeg(out.toByteArray())
-                cropped.recycle()
-                rawBitmap.recycle()
-            } catch (e: Exception) {
-                Log.w(TAG, "Dropped MJPEG frame", e)
-            } finally {
-                image.close()
-            }
+                val raw = Bitmap.createBitmap(paddedWidth, height, Bitmap.Config.ARGB_8888)
+                try {
+                    raw.copyPixelsFromBuffer(buffer)
+                    val cropped = Bitmap.createBitmap(raw, 0, 0, width, height)
+                    try {
+                        val encoded = ByteArrayOutputStream()
+                        cropped.compress(Bitmap.CompressFormat.JPEG, settings.jpegQuality, encoded)
+                        server?.publishJpeg(encoded.toByteArray())
+                    } finally { cropped.recycle() }
+                } finally { raw.recycle() }
+            } catch (error: Exception) {
+                if (!stopping && generation == videoGeneration) Log.w(TAG, "Dropped MJPEG frame", error)
+            } finally { frame.close() }
         }, Handler(thread.looper))
-        display = projection!!.createVirtualDisplay("Pochi MJPEG", width, height, dpi,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR, reader.surface, null, null)
+        attachSurface(geometry, reader.surface)
+    }
+
+    private fun startInternalAudio() {
+        if (Build.VERSION.SDK_INT < 29 ||
+            checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            Log.w(TAG, "Audio capture requires Android 10 and RECORD_AUDIO permission")
+            return
+        }
+        val projection = projection ?: return
+        // Only user-approved playback (USAGE_MEDIA/GAME) may be captured; microphone is never used.
+        try {
+            val config = AudioPlaybackCaptureConfiguration.Builder(projection)
+                .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
+                .addMatchingUsage(AudioAttributes.USAGE_GAME)
+                .build()
+            val format = AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                .setSampleRate(48_000).setChannelMask(AudioFormat.CHANNEL_IN_MONO).build()
+            val minimum = AudioRecord.getMinBufferSize(48_000, AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT)
+            require(minimum > 0) { "Audio input unsupported" }
+            val recorder = AudioRecord.Builder().setAudioPlaybackCaptureConfig(config)
+                .setAudioFormat(format).setBufferSizeInBytes(max(minimum, 8192)).build()
+            check(recorder.state == AudioRecord.STATE_INITIALIZED) { "AudioRecord failed" }
+            audioRecord = recorder
+            recorder.startRecording()
+            audioRunning = true
+            server?.setAudioAvailable(true)
+            audioThread = Thread({
+                val chunk = ByteArray(3840) // 40 ms at 48kHz, mono, PCM16LE
+                try {
+                    while (audioRunning && !stopping) {
+                        val n = recorder.read(chunk, 0, chunk.size, AudioRecord.READ_BLOCKING)
+                        if (n > 0) server?.publishAudio(chunk.copyOf(n))
+                        else if (n < 0) break
+                    }
+                } catch (error: Exception) {
+                    if (!stopping) Log.w(TAG, "Internal audio capture stopped", error)
+                }
+            }, "Pochi-Internal-Audio").also { it.start() }
+        } catch (error: Exception) {
+            server?.setAudioAvailable(false)
+            Log.w(TAG, "Audio unavailable; continuing video-only", error)
+            runCatching { audioRecord?.release() }
+            audioRecord = null
+        }
     }
 
     private fun notifyStatus(message: String, link: String?, active: Boolean) {
@@ -240,15 +374,22 @@ class CaptureService : Service() {
 
     override fun onDestroy() {
         stopping = true
-        runCatching { display?.release() }
-        runCatching { imageReader?.close() }
-        runCatching { imageThread?.quitSafely() }
-        runCatching { codec?.stop() }
-        runCatching { codec?.release() }
-        runCatching { codecSurface?.release() }
-        drainThread?.interrupt()
+        audioRunning = false
+        server?.setAudioAvailable(false)
+        mainHandler.removeCallbacks(resizeRunnable)
+        if (::displayManager.isInitialized) runCatching { displayManager.unregisterDisplayListener(displayListener) }
+        runCatching { audioRecord?.stop() }
+        runCatching { audioThread?.join(300) }
+        runCatching { audioRecord?.release() }
+        audioRecord = null
+        runCatching { virtualDisplay?.setSurface(null) }
+        stopVideoPipeline()
+        runCatching { virtualDisplay?.release() }
+        virtualDisplay = null
         runCatching { projection?.stop() }
+        projection = null
         server?.close()
+        server = null
         if (!status.startsWith("Error:")) notifyStatus("Not sharing", null, false)
         else running = false
         super.onDestroy()
@@ -261,14 +402,11 @@ class CaptureService : Service() {
         const val ACTION_START = "io.github.lvlahti.pochi.START"
         const val ACTION_STOP = "io.github.lvlahti.pochi.STOP"
         const val ACTION_STATUS = "io.github.lvlahti.pochi.STATUS"
-        const val EXTRA_MODE = "mode"
         const val EXTRA_RESULT_CODE = "result_code"
         const val EXTRA_RESULT_DATA = "result_data"
         const val EXTRA_STATUS = "status"
         const val EXTRA_RUNNING = "running"
         const val EXTRA_URL = "url"
-        const val MODE_H264 = "h264"
-        const val MODE_MJPEG = "mjpeg"
         @Volatile var status: String = "Not sharing"
             private set
         @Volatile var url: String? = null
