@@ -4,7 +4,6 @@
         <item name="android:colorAccent">#FFFFFF</item>
         <item name="android:colorControlHighlight">#555555</item>
         <item name="android:colorButtonNormal">#303030</item>
-        <item name="android:windowLightNavigationBar">false</item>
         <item name="android:textColorPrimary">#FFFFFF</item>
         <item name="android:textColorSecondary">#BDBDBD</item>
         <item name="android:windowBackground">#060606</item>
