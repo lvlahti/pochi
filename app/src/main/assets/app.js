@@ -9,6 +9,10 @@ const dot = document.getElementById('dot');
 const modeLabel = document.getElementById('mode');
 const fpsLabel = document.getElementById('fps');
 const delayLabel = document.getElementById('delay');
+const bitrateStat = document.getElementById('bitrateStat');
+const viewersStat = document.getElementById('viewersStat');
+const queueStat = document.getElementById('queueStat');
+const cinemaToggle = document.getElementById('cinemaToggle');
 const screen = document.getElementById('screen');
 const audioButton = document.getElementById('audioToggle');
 const volumeControl = document.getElementById('volumeControl');
@@ -16,7 +20,19 @@ const volumeSlider = document.getElementById('audioVolume');
 const volumeValue = document.getElementById('volumeValue');
 const audioLabel = document.getElementById('audioStatus');
 const token = new URLSearchParams(location.search).get('token');
-const suffix = '?token=' + encodeURIComponent(token || '');
+const viewerId = (() => {
+  try {
+    const saved = sessionStorage.getItem('pochi.viewerId');
+    if (/^[0-9a-f]{32}$/.test(saved || '')) return saved;
+  } catch (_) { /* private browsing may disable storage */ }
+  const bytes = new Uint8Array(16);
+  if (window.crypto?.getRandomValues) crypto.getRandomValues(bytes);
+  else for (let i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+  const id = Array.from(bytes, n => n.toString(16).padStart(2, '0')).join('');
+  try { sessionStorage.setItem('pochi.viewerId', id); } catch (_) {}
+  return id;
+})();
+const suffix = '?token=' + encodeURIComponent(token || '') + '&viewer=' + viewerId;
 let socket = null;
 let audioSocket = null;
 let media = null;
@@ -32,6 +48,10 @@ let audioEnabled = false;
 let audioContext = null;
 let audioGain = null;
 let audioPlayHead = 0;
+let statsTimer = null;
+let clockOffsetMs = null;
+let lastVideoBufferMs = 0;
+let cinemaHideTimer = null;
 
 function showStatus(text, online) {
   state.textContent = text;
@@ -44,6 +64,8 @@ function showPicture() { placeholder.hidden = true; }
 function closeStream() {
   attemptId++;
   clearTimeout(retryTimer);
+  clearInterval(statsTimer);
+  statsTimer = null;
   if (socket) { const old = socket; socket = null; old.onclose = null; old.close(); }
   if (audioSocket) { const old = audioSocket; audioSocket = null; old.onclose = null; old.close(); }
   if (buffer && media && media.readyState === 'open') {
@@ -77,7 +99,8 @@ function pump() {
       try { video.currentTime = Math.max(0, liveEnd - .12); } catch (_) {}
     }
     if (video.paused) video.play().catch(() => {});
-    delayLabel.textContent = behind > 0 ? 'Buffered ' + behind.toFixed(1) + 's' : 'Live';
+    lastVideoBufferMs = Math.max(0, Math.round(behind * 1000));
+    delayLabel.textContent = lastVideoBufferMs + ' ms buffer';
     if (video.currentTime > 6 && video.buffered.start(0) < video.currentTime - 3) {
       try { buffer.remove(0, video.currentTime - 2); } catch (_) {}
     }
@@ -184,17 +207,72 @@ audioButton.addEventListener('click', async () => {
   } catch (error) { showError('Cannot enable audio: ' + error.message); }
 });
 
+function updateStreamStats(data, requestStarted, requestEnded) {
+  if (Number.isFinite(data.serverUptimeMs)) {
+    const estimate = (requestStarted + requestEnded) / 2 - data.serverUptimeMs;
+    clockOffsetMs = clockOffsetMs == null ? estimate : clockOffsetMs * .8 + estimate * .2;
+  }
+  bitrateStat.textContent = Number.isFinite(data.realKbps) ? Math.round(data.realKbps) + ' kbps' : '—';
+  viewersStat.textContent = Number.isFinite(data.viewers) ? String(data.viewers) : '—';
+  queueStat.textContent = Number.isFinite(data.queueDepth) ? String(data.queueDepth) + ' queued' : '—';
+  if (!jpeg.hidden) {
+    fpsLabel.textContent = Number.isFinite(data.realFps) ? Math.round(data.realFps) + ' FPS' : 'MJPEG';
+    delayLabel.textContent = 'n/a · MJPEG';
+  }
+}
+function beginStatsPolling() {
+  clearInterval(statsTimer);
+  statsTimer = setInterval(async () => {
+    try {
+      const started = performance.now();
+      const response = await fetch('/status' + suffix, { cache: 'no-store' });
+      if (!response.ok) return;
+      const data = await response.json();
+      updateStreamStats(data, started, performance.now());
+      // This is browser playback-buffer distance, NOT camera-to-display latency.
+      fetch('/feedback' + suffix + '&lagMs=' + Math.max(0, Math.min(5000, lastVideoBufferMs)),
+        { cache: 'no-store' }).catch(() => {});
+    } catch (_) { /* keep video playing during short statistics outages */ }
+  }, 2000);
+}
+
+async function waitForApproval(current) {
+  while (current === attemptId) {
+    const response = await fetch('/authorize' + suffix, { cache: 'no-store' });
+    if (!response.ok) throw new Error('Viewer authorization unavailable or invalid link');
+    const answer = await response.json();
+    if (current !== attemptId) return false;
+    if (answer.state === 'approved') return true;
+    if (answer.state === 'denied') {
+      showStatus('Access denied', false);
+      showError('The phone owner denied this viewer. Open a new private tab to request again.');
+      return false;
+    }
+    showStatus('Waiting for phone approval…', false);
+    placeholder.hidden = false;
+    const heading = placeholder.querySelector('strong');
+    if (heading) heading.textContent = 'Approve this viewer on your phone';
+    await new Promise(resolve => setTimeout(resolve, 1300));
+  }
+  return false;
+}
+
 async function connect() {
   closeStream();
   const current = attemptId;
   showStatus('Connecting…', false);
   showError('');
   try {
+    if (!await waitForApproval(current)) return;
+    if (current !== attemptId) return;
+    const clockStarted = performance.now();
     const response = await fetch('/status' + suffix, { cache: 'no-store' });
     if (current !== attemptId) return;
     if (!response.ok) throw new Error('Invalid viewer link or sharing has stopped');
     const data = await response.json();
     if (current !== attemptId) return;
+    updateStreamStats(data, clockStarted, performance.now());
+    beginStatsPolling();
     audioAvailable = !!data.audio;
     audioButton.hidden = !audioAvailable;
     volumeControl.hidden = !audioAvailable || !audioEnabled;
