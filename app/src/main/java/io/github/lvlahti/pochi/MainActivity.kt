@@ -2,6 +2,7 @@ package io.github.lvlahti.pochi
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.ActivityNotFoundException
 import android.content.BroadcastReceiver
 import android.content.ClipData
@@ -13,17 +14,24 @@ import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.graphics.Color
+import android.graphics.Bitmap
 import android.view.MotionEvent
 import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.CheckBox
+import android.widget.ImageView
 import android.widget.Toast
 import android.widget.Spinner
 import android.widget.TextView
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.MultiFormatWriter
 
 class MainActivity : Activity() {
     private lateinit var statusText: TextView
@@ -44,10 +52,32 @@ class MainActivity : Activity() {
     private lateinit var qualityLabel: TextView
     private lateinit var bitrateLabel: TextView
     private lateinit var audioCheckbox: CheckBox
+    private lateinit var autoQualityCheckbox: CheckBox
+    private lateinit var qrImage: ImageView
+    private lateinit var liveStatsText: TextView
+    private var qrForLink: String? = null
+    private var qrBitmap: Bitmap? = null
+    private var approvalDialogOpen = false
+    private val uiHandler = Handler(Looper.getMainLooper())
+    private val statsRefresh = object : Runnable {
+        override fun run() {
+            val stats = CaptureService.streamStats()
+            liveStatsText.visibility = if (stats == null || !CaptureService.running) View.GONE else View.VISIBLE
+            if (stats != null && CaptureService.running) {
+                val buffer = if (stats.viewerLagMs > 0) " · viewer buffer ~${stats.viewerLagMs}ms" else ""
+                liveStatsText.text = "${stats.fps} FPS · ${stats.kbps} kbps · ${stats.viewers} viewers" + buffer
+            }
+            uiHandler.postDelayed(this, 1500L)
+        }
+    }
     private var pendingSettings = StreamSettings()
 
     private val statusReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
+            if (intent.action == CaptureService.ACTION_VIEWER_PENDING) {
+                showPendingApproval()
+                return
+            }
             renderStatus(
                 intent.getStringExtra(CaptureService.EXTRA_STATUS) ?: "Not sharing",
                 intent.getStringExtra(CaptureService.EXTRA_URL),
@@ -76,6 +106,9 @@ class MainActivity : Activity() {
         qualityLabel = findViewById(R.id.qualityLabel)
         bitrateLabel = findViewById(R.id.bitrateLabel)
         audioCheckbox = findViewById(R.id.audioCheckbox)
+        autoQualityCheckbox = findViewById(R.id.autoQualityCheckbox)
+        qrImage = findViewById(R.id.qrImage)
+        liveStatsText = findViewById(R.id.liveStatsText)
         setup(transportSpinner, arrayOf("USB cable (tethering)", "Wi-Fi (same network)"))
         setup(modeSpinner, arrayOf("H.264 · hardware accelerated", "MJPEG · compatibility"))
         setup(resolutionSpinner, EDGES.map { "${it}p maximum edge" }.toTypedArray())
@@ -90,6 +123,7 @@ class MainActivity : Activity() {
         bitrateSpinner.setSelection(prefs.getInt("bitrate", 2).coerceIn(0, BITRATES.lastIndex))
         qualitySpinner.setSelection(prefs.getInt("quality", 2).coerceIn(0, QUALITIES.lastIndex))
         audioCheckbox.isChecked = prefs.getBoolean("audio", false) && Build.VERSION.SDK_INT >= 29
+        autoQualityCheckbox.isChecked = prefs.getBoolean("auto_quality", true)
         if (Build.VERSION.SDK_INT < 29) {
             audioCheckbox.isEnabled = false
             audioCheckbox.text = "Internal audio requires Android 10+"
@@ -134,7 +168,8 @@ class MainActivity : Activity() {
                 fps = FRAME_RATES[fpsSpinner.selectedItemPosition],
                 bitrateKbps = BITRATES[bitrateSpinner.selectedItemPosition],
                 jpegQuality = QUALITIES[qualitySpinner.selectedItemPosition],
-                audio = audioCheckbox.isChecked && Build.VERSION.SDK_INT >= 29
+                audio = audioCheckbox.isChecked && Build.VERSION.SDK_INT >= 29,
+                autoQuality = autoQualityCheckbox.isChecked
             )
             prefs.edit()
                 .putInt("transport", transportSpinner.selectedItemPosition)
@@ -144,6 +179,7 @@ class MainActivity : Activity() {
                 .putInt("bitrate", bitrateSpinner.selectedItemPosition)
                 .putInt("quality", qualitySpinner.selectedItemPosition)
                 .putBoolean("audio", pendingSettings.audio)
+                .putBoolean("auto_quality", pendingSettings.autoQuality)
                 .apply()
             if (pendingSettings.audio && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), AUDIO_PERMISSION_REQUEST)
@@ -226,6 +262,45 @@ class MainActivity : Activity() {
         Toast.makeText(this, "Open Settings → Portable hotspot → USB tethering", Toast.LENGTH_LONG).show()
     }
 
+    private fun showPendingApproval() {
+        if (approvalDialogOpen || isFinishing) return
+        val viewer = CaptureService.pendingViewers().firstOrNull() ?: return
+        approvalDialogOpen = true
+        val dialog = AlertDialog.Builder(this)
+            .setTitle("Allow this viewer?")
+            .setMessage("Device at ${viewer.ip} wants to watch your screen and available audio. Allow only if you recognize the device.\n\nRequest: ${viewer.id.takeLast(8)}")
+            .setPositiveButton("Allow") { _, _ -> CaptureService.decideViewer(viewer.id, true) }
+            .setNegativeButton("Deny") { _, _ -> CaptureService.decideViewer(viewer.id, false) }
+            .setCancelable(false).create()
+        dialog.setOnDismissListener {
+            approvalDialogOpen = false
+            uiHandler.post { showPendingApproval() }
+        }
+        dialog.show()
+    }
+
+    private fun showQr(link: String?) {
+        if (qrForLink == link) return
+        qrImage.setImageBitmap(null)
+        qrBitmap?.recycle()
+        qrBitmap = null
+        qrForLink = link
+        if (link.isNullOrEmpty()) return
+        try {
+            val pixels = MultiFormatWriter().encode(link, BarcodeFormat.QR_CODE, 256, 256,
+                mapOf(EncodeHintType.MARGIN to 1))
+            val colors = IntArray(256 * 256) { index ->
+                if (pixels[index % 256, index / 256]) Color.BLACK else Color.WHITE
+            }
+            val bitmap = Bitmap.createBitmap(colors, 256, 256, Bitmap.Config.ARGB_8888)
+            qrBitmap = bitmap
+            qrImage.setImageBitmap(bitmap)
+        } catch (error: Exception) {
+            qrForLink = null
+            qrImage.contentDescription = "QR generation unavailable; use Copy link"
+        }
+    }
+
     private fun setup(spinner: Spinner, choices: Array<String>) {
         val adapter = ArrayAdapter(this, R.layout.spinner_item, choices)
         adapter.setDropDownViewResource(R.layout.spinner_dropdown_item)
@@ -248,13 +323,21 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
-        val filter = IntentFilter(CaptureService.ACTION_STATUS)
+        val filter = IntentFilter(CaptureService.ACTION_STATUS).apply { addAction(CaptureService.ACTION_VIEWER_PENDING) }
         if (Build.VERSION.SDK_INT >= 33) registerReceiver(statusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
         else { @Suppress("DEPRECATION") registerReceiver(statusReceiver, filter) }
         renderStatus(CaptureService.status, CaptureService.url, CaptureService.running)
+        uiHandler.post(statsRefresh)
+        uiHandler.post { showPendingApproval() }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        uiHandler.post { showPendingApproval() }
     }
 
     override fun onStop() {
+        uiHandler.removeCallbacks(statsRefresh)
         unregisterReceiver(statusReceiver)
         super.onStop()
     }
@@ -306,6 +389,7 @@ class MainActivity : Activity() {
         stopButton.isEnabled = live
 
         currentShareUrl = if (live) link else null
+        showQr(currentShareUrl)
         val wasVisible = shareCard.visibility == View.VISIBLE
         shareCard.visibility = if (live) View.VISIBLE else View.GONE
         urlText.text = currentShareUrl.orEmpty()
