@@ -3,70 +3,399 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
-    android:background="#080808">
+    android:clipToPadding="false"
+    android:background="#060606">
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="28dp" android:text="●  POCHI / 0.3"
-            android:textColor="#FFFFFF" android:textStyle="bold" android:letterSpacing="0.12" android:textSize="24sp" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="12dp" android:text="Your screen. Your settings."
-            android:textColor="#FFFFFF" android:textStyle="bold" android:textSize="22sp" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="8dp" android:text="Stream to a web browser on Windows or any computer. No receiver installation needed."
-            android:textColor="#A6A6A6" android:textSize="14sp" />
+        android:paddingLeft="20dp"
+        android:paddingRight="20dp"
+        android:paddingTop="23dp"
+        android:paddingBottom="38dp">
 
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="28dp"
-            android:text="CONNECTION" android:textColor="#FFFFFF" android:textStyle="bold" android:letterSpacing="0.08" />
-        <Spinner android:id="@+id/transportSpinner" android:layout_width="match_parent" android:layout_height="48dp" android:backgroundTint="#FFFFFF" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="USB: enable USB tethering first. Wi-Fi: put both devices on the same trusted network."
-            android:textColor="#A6A6A6" android:textSize="12sp" />
-        <Button android:id="@+id/settingsButton" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" android:text="Open network settings" android:textAllCaps="false" />
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="22dp"
-            android:text="VIDEO ENCODING" android:textColor="#FFFFFF" android:textStyle="bold" android:letterSpacing="0.08" />
-        <Spinner android:id="@+id/modeSpinner" android:layout_width="match_parent" android:layout_height="48dp" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="14dp"
-            android:text="Maximum resolution (longest edge)" android:textColor="#DEDEDE" />
-        <Spinner android:id="@+id/resolutionSpinner" android:layout_width="match_parent" android:layout_height="48dp" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="10dp"
-            android:text="Frame rate" android:textColor="#DEDEDE" />
-        <Spinner android:id="@+id/fpsSpinner" android:layout_width="match_parent" android:layout_height="48dp" />
-        <TextView android:id="@+id/bitrateLabel" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" android:text="H.264 video bitrate" android:textColor="#DEDEDE" />
-        <Spinner android:id="@+id/bitrateSpinner" android:layout_width="match_parent" android:layout_height="48dp" />
-        <TextView android:id="@+id/qualityLabel" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" android:text="JPEG quality" android:textColor="#DEDEDE" android:visibility="gone" />
-        <Spinner android:id="@+id/qualitySpinner" android:layout_width="match_parent" android:layout_height="48dp" android:visibility="gone" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp"
-            android:text="High FPS, resolution and bitrate increase bandwidth and battery use. Actual FPS may be lower than selected."
-            android:textColor="#A6A6A6" android:textSize="12sp" />
+            <TextView
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:background="@drawable/pochi_logo"
+                android:gravity="center"
+                android:text="◉"
+                android:textColor="#FFFFFF"
+                android:textSize="25sp" />
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginLeft="12dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="POCHI"
+                    android:letterSpacing="0.2"
+                    android:textColor="#FFFFFF"
+                    android:textSize="19sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="SCREEN MIRROR"
+                    android:letterSpacing="0.16"
+                    android:textColor="#979797"
+                    android:textSize="10sp" />
+            </LinearLayout>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="34dp"
+                android:background="@drawable/pochi_chip"
+                android:gravity="center"
+                android:paddingLeft="13dp"
+                android:paddingRight="13dp"
+                android:text="v 0.4"
+                android:textColor="#E9E9E9"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </LinearLayout>
 
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="24dp"
-            android:text="AUDIO" android:textColor="#FFFFFF" android:textStyle="bold" android:letterSpacing="0.08" />
-        <CheckBox android:id="@+id/audioCheckbox" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:buttonTint="#FFFFFF" android:text="Share internal app audio (experimental)" android:textColor="#FFFFFF" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="Requires Android 10+ and recording permission. Some apps/DRM block internal audio. On the viewer click Enable audio. This does not capture the microphone."
-            android:textColor="#A6A6A6" android:textSize="12sp" />
+        <LinearLayout
+            android:id="@+id/heroCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="28dp"
+            android:background="@drawable/pochi_hero"
+            android:elevation="6dp"
+            android:orientation="vertical"
+            android:padding="25dp">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.17"
+                android:text="✦   YOUR SCREEN. REIMAGINED."
+                android:textColor="#C3C3C3"
+                android:textSize="10sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="15dp"
+                android:text="A bigger view.\nA better flow."
+                android:textColor="#FFFFFF"
+                android:textSize="31sp"
+                android:lineSpacingExtra="3dp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="13dp"
+                android:text="Mirror beautifully over USB or Wi-Fi — straight to your browser. No receiver app needed."
+                android:textColor="#B7B7B7"
+                android:textSize="13sp"
+                android:lineSpacingExtra="5dp" />
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:background="@drawable/pochi_chip"
+                android:paddingLeft="14dp"
+                android:paddingRight="14dp"
+                android:paddingTop="9dp"
+                android:paddingBottom="9dp"
+                android:text="◉  PRIVATE  /  LOCAL  /  LIVE"
+                android:textColor="#E2E2E2"
+                android:letterSpacing="0.08"
+                android:textSize="10sp" />
+        </LinearLayout>
 
-        <Button android:id="@+id/startButton" android:layout_width="match_parent" android:layout_height="54dp"
-            android:layout_marginTop="30dp" android:backgroundTint="#FFFFFF"
-            android:textColor="#080808" android:textStyle="bold" android:text="Start sharing" android:textAllCaps="false" />
-        <Button android:id="@+id/stopButton" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="6dp" android:enabled="false" android:text="Stop sharing" android:textAllCaps="false" />
-        <TextView android:id="@+id/statusText" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="22dp" android:text="Not sharing" android:textColor="#DEDEDE" android:textSize="15sp" />
-        <TextView android:id="@+id/urlText" android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="10dp" android:autoLink="web" android:textColor="#FFFFFF"
-            android:textIsSelectable="true" android:textSize="17sp" android:textStyle="bold" />
-        <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:layout_marginTop="22dp" android:text="Screen capture needs your consent each time. Wi-Fi viewers on the same local network can access the stream with the displayed private link. Never share it on untrusted networks."
-            android:textSize="12sp" android:textColor="#8A8A8A" android:lineSpacingExtra="4dp" />
+        <LinearLayout
+            android:id="@+id/connectionCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/pochi_glass_card"
+            android:elevation="3dp"
+            android:orientation="vertical"
+            android:padding="20dp">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.14"
+                android:text="01    CONNECTION"
+                android:textColor="#F4F4F4"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Pick how your devices talk."
+                android:textColor="#969696"
+                android:textSize="12sp" />
+            <Spinner
+                android:id="@+id/transportSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="15dp"
+                android:background="@drawable/pochi_glass_field"
+                android:dropDownVerticalOffset="4dp"
+                android:spinnerMode="dropdown" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="13dp"
+                android:text="USB: enable tethering. Wi-Fi: join the same trusted network."
+                android:textColor="#B3B3B3"
+                android:textSize="12sp"
+                android:lineSpacingExtra="3dp" />
+            <Button
+                android:id="@+id/settingsButton"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="14dp"
+                android:background="@drawable/pochi_secondary_button"
+                android:backgroundTint="@null"
+                android:text="Network settings    ↗"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/videoCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/pochi_glass_card"
+            android:elevation="3dp"
+            android:orientation="vertical"
+            android:padding="20dp">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.14"
+                android:text="02    VIDEO STUDIO"
+                android:textColor="#F4F4F4"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Fine-tune your stream, your way."
+                android:textColor="#969696"
+                android:textSize="12sp" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="Encoding"
+                android:textColor="#D2D2D2"
+                android:textSize="13sp" />
+            <Spinner
+                android:id="@+id/modeSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/pochi_glass_field" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="17dp"
+                android:text="Maximum resolution"
+                android:textColor="#D2D2D2"
+                android:textSize="13sp" />
+            <Spinner
+                android:id="@+id/resolutionSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/pochi_glass_field" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="17dp"
+                android:text="Frame rate"
+                android:textColor="#D2D2D2"
+                android:textSize="13sp" />
+            <Spinner
+                android:id="@+id/fpsSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/pochi_glass_field" />
+            <TextView
+                android:id="@+id/bitrateLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="17dp"
+                android:text="H.264 bitrate"
+                android:textColor="#D2D2D2"
+                android:textSize="13sp" />
+            <Spinner
+                android:id="@+id/bitrateSpinner"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/pochi_glass_field" />
+            <TextView
+                android:id="@+id/qualityLabel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="17dp"
+                android:text="JPEG quality"
+                android:textColor="#D2D2D2"
+                android:textSize="13sp"
+                android:visibility="gone" />
+            <Spinner
+                android:id="@+id/qualitySpinner"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/pochi_glass_field"
+                android:visibility="gone" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="13dp"
+                android:text="Higher settings use more bandwidth and battery. Actual FPS depends on hardware."
+                android:textColor="#979797"
+                android:lineSpacingExtra="3dp"
+                android:textSize="11sp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/audioCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/pochi_glass_card"
+            android:elevation="3dp"
+            android:orientation="vertical"
+            android:padding="20dp">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.14"
+                android:text="03    SOUND SPACE"
+                android:textColor="#F4F4F4"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+            <CheckBox
+                android:id="@+id/audioCheckbox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:buttonTint="#FFFFFF"
+                android:paddingTop="6dp"
+                android:paddingBottom="6dp"
+                android:text="Share internal app audio"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="5dp"
+                android:text="Experimental · Android 10+ · Some apps restrict audio capture. The microphone is not streamed."
+                android:textColor="#A3A3A3"
+                android:textSize="12sp"
+                android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/controlCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/pochi_glass_card"
+            android:elevation="4dp"
+            android:orientation="vertical"
+            android:padding="20dp">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:letterSpacing="0.14"
+                android:text="04    GO LIVE"
+                android:textColor="#F4F4F4"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+            <Button
+                android:id="@+id/startButton"
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:layout_marginTop="19dp"
+                android:background="@drawable/pochi_primary_button"
+                android:backgroundTint="@null"
+                android:text="Start sharing    →"
+                android:textAllCaps="false"
+                android:textColor="#0A0A0A"
+                android:textSize="15sp"
+                android:textStyle="bold" />
+            <Button
+                android:id="@+id/stopButton"
+                android:layout_width="match_parent"
+                android:layout_height="50dp"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/pochi_secondary_button"
+                android:backgroundTint="@null"
+                android:enabled="false"
+                android:text="Stop sharing"
+                android:textAllCaps="false"
+                android:textColor="#FFFFFF"
+                android:textSize="14sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="22dp"
+                android:background="@drawable/pochi_chip"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:padding="13dp">
+                <TextView
+                    android:id="@+id/statusIndicator"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="●"
+                    android:textColor="#B9B9B9"
+                    android:textSize="12sp" />
+                <TextView
+                    android:id="@+id/statusText"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginLeft="11dp"
+                    android:layout_weight="1"
+                    android:text="Not sharing"
+                    android:textColor="#DCDCDC"
+                    android:textSize="13sp" />
+            </LinearLayout>
+            <TextView
+                android:id="@+id/urlText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="13dp"
+                android:autoLink="web"
+                android:textColor="#FFFFFF"
+                android:textIsSelectable="true"
+                android:textSize="13sp"
+                android:lineSpacingExtra="3dp" />
+        </LinearLayout>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="25dp"
+            android:gravity="center"
+            android:lineSpacingExtra="5dp"
+            android:text="Designed for your screen, not the cloud.\nOnly share on networks you trust."
+            android:textColor="#7B7B7B"
+            android:textSize="11sp" />
     </LinearLayout>
 </ScrollView>
