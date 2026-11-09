@@ -1,18 +1,26 @@
 # Pochi 🐾 — Android screen mirroring over USB or Wi-Fi
 
-**Pochi v0.4** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
+**Pochi v0.5** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
 
-## What's new in v0.4
+## What's new in v0.5
 
 - **Monochrome UI:** both the Android app and the browser receiver use only black, white, and grayscale. Error messages are the only red UI elements.
 - **Browser volume slider:** after clicking **Enable audio**, a 0–100% slider appears beside the button. The slider controls a Web Audio `GainNode` immediately and disappears when audio is muted.
-- All v0.4 features—USB/Wi-Fi, rotation handling, custom video quality/FPS/bitrate, and optional internal audio—remain available.
+- All v0.5 features—USB/Wi-Fi, rotation handling, custom video quality/FPS/bitrate, and optional internal audio—remain available.
 
-## v0.4 — Glass Edition
+## v0.5 — Glass Edition
 
 The Android sender and browser receiver now share a polished monochrome design inspired by premium desktop and mobile controls. Both have layered panels, soft highlights, rounded controls and deliberate motion. The browser uses frosted-glass CSS backdrop blur; Android uses efficient native gradient drawables and light elevation (no expensive continuous background blur). Key Android actions use responsive press animations and settings cards enter with a gentle stagger. Audio controls still reveal the real 0–100% Web Audio volume slider after clicking **Enable audio**.
 
 **Color rule:** black, white and grays only; red is reserved for error messages. Web transitions respect the reduced-motion accessibility preference.
+
+## v0.5 — live controls, secure-by-default link sharing and connection settings
+
+- **Live button states:** the Start live button becomes a green, disabled **You are live** indicator only after screen sharing succeeds and a browser URL is ready. A red **Stop live** button appears beneath it, and disappears when sharing stops. While Android capture permission is processing, the start button displays **Starting live…**.
+- **Copy or share viewer link:** a polished link card appears only during a confirmed session. **Copy link** copies the entire URL (including its temporary access token) to the clipboard; **Share** opens Android's share sheet so you can send the same link to another app. Don't share the link outside your trusted USB/Wi-Fi network.
+- **Network settings shortcut:** when USB is selected, attempts to open Android's tethering settings via `android.settings.TETHER_SETTINGS`; if unsupported it tries the system tethering activity, then Settings with the manual guidance `Portable hotspot → USB tethering`. When Wi-Fi is selected, the button opens Wi-Fi settings. Xiaomi/HyperOS may block deep links, so no third-party app can guarantee a direct jump to the USB tethering toggle.
+
+The glass visual style, hardware-encoded H.264, optional MJPEG, local USB/Wi-Fi streaming, rotation and experimental internal audio remain in place.
 
 ## Features
 
@@ -61,6 +69,6 @@ Debug builds are signed with Android's debug key (not intended as production-sig
 
 ## Status
 
-**v0.4 preview — CI build and unit tests; device-specific rotation/audio/Wi-Fi behavior should be tested on physical phones.** See `QUICKSTART-fa.md` for the Persian guide.
+**v0.5 preview — CI build and unit tests; device-specific rotation/audio/Wi-Fi behavior should be tested on physical phones.** See `QUICKSTART-fa.md` for the Persian guide.
 
 MIT License.
