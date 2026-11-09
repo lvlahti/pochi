@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101622">
+  <title>Pochi — Screen Mirror</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header>
+      <div class="brand"><span class="mark">●</span> POCHI <span class="subbrand">/ USB SCREEN MIRROR</span></div>
+      <div class="live"><span id="dot" class="dot"></span><span id="state">Connecting…</span></div>
+    </header>
+
+    <main>
+      <div class="heading">
+        <div>
+          <div class="eyebrow">ANDROID → WINDOWS</div>
+          <h1>Your phone, on the big screen.</h1>
+          <p>Direct USB tethering · No internet · No Windows software</p>
+        </div>
+        <div class="toolbar">
+          <button id="reconnect" type="button">↻ Reconnect</button>
+          <button id="fullscreen" type="button" class="primary">⛶ Fullscreen</button>
+        </div>
+      </div>
+
+      <div id="screen" class="screen">
+        <video id="video" autoplay muted playsinline></video>
+        <img id="mjpeg" alt="Live Android screen" hidden>
+        <div id="placeholder" class="placeholder">
+          <span class="pulse">◉</span>
+          <strong>Waiting for your screen</strong>
+          <small>Check that sharing is active in Pochi on Android.</small>
+        </div>
+        <div class="screen-label">POCHI / LIVE USB MIRROR</div>
+      </div>
+
+      <div class="footer">
+        <div><span class="green">●</span> <span id="mode">Detecting video mode</span></div>
+        <div><span id="fps">— FPS</span> <span class="divider">/</span> <span id="delay">Low-latency stream</span></div>
+      </div>
+      <p id="error" class="error" role="status"></p>
+      <p class="privacy">This stream is local to the USB tether network. Only share your screen with a computer you trust. Stop sharing from Pochi when you're done.</p>
+    </main>
+  </div>
+</body>
+</html>

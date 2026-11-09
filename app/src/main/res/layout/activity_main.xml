@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true"
+    android:background="#101622">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="26dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="44dp"
+            android:text="●  POCHI"
+            android:textColor="#88E0CA"
+            android:textStyle="bold"
+            android:letterSpacing="0.14"
+            android:textSize="28sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Your screen. One cable."
+            android:textColor="#F0F5FF"
+            android:textSize="23sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Mirror to your Windows browser over USB tethering. No receiver app or Wi-Fi needed."
+            android:textColor="#AEB9D0"
+            android:lineSpacingExtra="5dp"
+            android:textSize="15sp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="38dp"
+            android:text="1  CONNECT USB"
+            android:textColor="#88E0CA"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Plug in a data cable. In Android settings, enable USB tethering before you start."
+            android:textColor="#D4DBEB"
+            android:textSize="15sp" />
+
+        <Button
+            android:id="@+id/settingsButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:text="Open network settings"
+            android:textAllCaps="false" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="30dp"
+            android:text="2  SELECT MODE"
+            android:textColor="#88E0CA"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <RadioGroup
+            android:id="@+id/modeGroup"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical">
+            <RadioButton
+                android:id="@+id/balancedRadio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:textColor="#F0F5FF"
+                android:text="Balanced · H.264 hardware encoding" />
+            <RadioButton
+                android:id="@+id/compatRadio"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textColor="#F0F5FF"
+                android:text="Compatibility · MJPEG" />
+        </RadioGroup>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="30dp"
+            android:text="3  START SHARING"
+            android:textColor="#88E0CA"
+            android:textStyle="bold"
+            android:textSize="13sp" />
+
+        <Button
+            android:id="@+id/startButton"
+            android:layout_width="match_parent"
+            android:layout_height="56dp"
+            android:layout_marginTop="12dp"
+            android:backgroundTint="#88E0CA"
+            android:textColor="#101622"
+            android:textAllCaps="false"
+            android:text="Start sharing" />
+
+        <Button
+            android:id="@+id/stopButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:enabled="false"
+            android:textAllCaps="false"
+            android:text="Stop sharing" />
+
+        <TextView
+            android:id="@+id/statusText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="22dp"
+            android:text="Not sharing"
+            android:textColor="#D4DBEB"
+            android:textSize="15sp" />
+
+        <TextView
+            android:id="@+id/urlText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:autoLink="web"
+            android:textColor="#88E0CA"
+            android:textIsSelectable="true"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="32dp"
+            android:text="Screen capture requires Android's permission. DRM-protected content and audio are not captured. Only share with a computer you trust."
+            android:textSize="12sp"
+            android:textColor="#8290AC"
+            android:lineSpacingExtra="4dp" />
+    </LinearLayout>
+</ScrollView>
