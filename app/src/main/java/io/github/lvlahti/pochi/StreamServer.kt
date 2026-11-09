@@ -2,11 +2,14 @@ package io.github.lvlahti.pochi
 
 import android.content.Context
 import android.util.Log
+import android.os.SystemClock
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.net.Inet4Address
 import java.net.InetSocketAddress
 import java.net.ServerSocket
@@ -18,13 +21,15 @@ import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.LinkedBlockingDeque
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /** Browser-only receiver bound to the selected local interface; access requires an unguessable URL token. */
 class StreamServer(
     private val context: Context,
     private val address: Inet4Address,
     private val settings: StreamSettings,
-    private val port: Int = 8822
+    private val port: Int = 8822,
+    private val onViewerPending: (ViewerGate.Request) -> Unit = { }
 ) : AutoCloseable {
     private val token: String = ByteArray(16).also { SecureRandom().nextBytes(it) }
         .joinToString("") { "%02x".format(it.toInt() and 0xff) }
@@ -37,6 +42,49 @@ class StreamServer(
     @Volatile private var initialization: ByteArray? = null
     @Volatile private var mime = ""
     @Volatile private var audioAvailable = false
+    private val gate = ViewerGate()
+    private val framesTotal = AtomicLong()
+    private val encodedBytes = AtomicLong()
+    private val droppedPackets = AtomicLong()
+    @Volatile private var lastViewerLagMs = 0
+    private var lastFpsTick = SystemClock.elapsedRealtime()
+    private var lastFrames = 0L
+    private var lastBytes = 0L
+    private var observedFps = 0
+    private var observedKbps = 0
+
+    data class Stats(val fps: Int, val kbps: Int, val viewers: Int,
+        val queueDepth: Int, val dropped: Long, val viewerLagMs: Int)
+
+    @Synchronized fun stats(): Stats {
+        val now = SystemClock.elapsedRealtime()
+        val elapsed = now - lastFpsTick
+        if (elapsed >= 1000) {
+            val frames = framesTotal.get()
+            val bytes = encodedBytes.get()
+            observedFps = ((frames - lastFrames) * 1000L / elapsed).toInt()
+            observedKbps = ((bytes - lastBytes) * 8L / elapsed).toInt()
+            lastFrames = frames
+            lastBytes = bytes
+            lastFpsTick = now
+        }
+        return Stats(
+            observedFps, observedKbps,
+            if (settings.mode == StreamSettings.MODE_H264) websocketClients.size else mjpegClients.size,
+            maxOf(websocketClients.maxOfOrNull { it.queueDepth } ?: 0,
+                mjpegClients.maxOfOrNull { it.queueDepth } ?: 0),
+            droppedPackets.get(), lastViewerLagMs
+        )
+    }
+
+    fun recordVideoFrame(byteCount: Int) {
+        framesTotal.incrementAndGet()
+        encodedBytes.addAndGet(byteCount.toLong())
+    }
+
+    fun pendingViewers(): List<ViewerGate.Request> = gate.pending()
+    fun decideViewer(id: String, allow: Boolean): Boolean = gate.decide(id, allow)
+
 
     fun start() {
         server.reuseAddress = true
@@ -79,20 +127,47 @@ class StreamServer(
             val resource = path.substringBefore('?')
             val requestToken = path.substringAfter("?token=", "").substringBefore('&')
             val authorized = requestToken == token
+            val viewerId = path.substringAfter("&viewer=", "").substringBefore('&')
+            val viewerIp = socket.inetAddress.hostAddress.orEmpty()
             if (!authorized && resource != "/app.js" && resource != "/style.css") {
                 respond(output, 403, "text/plain", "Invalid Pochi viewer link".toByteArray()); return
             }
+            if (resource != "/" && resource != "/app.js" && resource != "/style.css" &&
+                resource != "/authorize" && !gate.authorized(viewerId, viewerIp)) {
+                respond(output, 403, "text/plain", "Approve this viewer on your phone first".toByteArray())
+                return
+            }
             when (resource) {
+                "/authorize" -> {
+                    val result = gate.request(viewerId, viewerIp)
+                    if (result.isNew) gate.pending().firstOrNull { it.id == viewerId }?.let(onViewerPending)
+                    val code = if (result.state == ViewerGate.State.INVALID || result.state == ViewerGate.State.FULL) 403 else 200
+                    respond(output, code, "application/json", JSONObject()
+                        .put("state", result.state.name.lowercase()).toString().toByteArray())
+                }
                 "/" -> serveAsset(output, "index.html", "text/html; charset=utf-8")
                 "/app.js" -> serveAsset(output, "app.js", "text/javascript; charset=utf-8")
                 "/style.css" -> serveAsset(output, "style.css", "text/css; charset=utf-8")
                 "/status" -> respond(output, 200, "application/json", JSONObject().apply {
+                    val metrics = stats()
                     put("mode", settings.mode)
                     put("transport", settings.transport)
                     put("audio", audioAvailable)
                     put("fps", settings.fps)
                     put("maxEdge", settings.maxEdge)
+                    put("autoQuality", settings.autoQuality)
+                    put("realFps", metrics.fps)
+                    put("realKbps", metrics.kbps)
+                    put("viewers", metrics.viewers)
+                    put("queueDepth", metrics.queueDepth)
+                    put("packetDrops", metrics.dropped)
+                    put("serverUptimeMs", SystemClock.elapsedRealtime())
                 }.toString().toByteArray())
+                "/feedback" -> {
+                    lastViewerLagMs = path.substringAfter("&lagMs=", "0").substringBefore('&')
+                        .toIntOrNull()?.coerceIn(0, 5000) ?: 0
+                    respond(output, 200, "application/json", "{}".toByteArray())
+                }
                 "/ws" -> {
                     if (settings.mode != StreamSettings.MODE_H264 ||
                         headers["origin"] != "http://$expectedHost" ||
@@ -103,7 +178,7 @@ class StreamServer(
                     val key = headers["sec-websocket-key"] ?: return
                     if (!handshake(output, key)) return
                     socket.soTimeout = 0
-                    val client = WebsocketClient(socket, output)
+                    val client = WebsocketClient(socket, output) { droppedPackets.incrementAndGet() }
                     websocketClients.add(client)
                     initialization?.let { client.sendInit(mime, it) }
                     client.start()
@@ -139,7 +214,7 @@ class StreamServer(
                         "Connection: close\r\n\r\n").toByteArray(Charsets.US_ASCII))
                     output.flush()
                     socket.soTimeout = 0
-                    val client = MjpegClient(socket, output)
+                    val client = MjpegClient(socket, output) { droppedPackets.incrementAndGet() }
                     mjpegClients.add(client)
                     client.writeLoop(running)
                     mjpegClients.remove(client)
@@ -170,7 +245,12 @@ class StreamServer(
     }
 
     private fun respond(out: OutputStream, code: Int, type: String, data: ByteArray) {
-        val status = if (code == 200) "OK" else if (code == 403) "Forbidden" else "Not Found"
+        val status = when (code) {
+            200 -> "OK"
+            403 -> "Forbidden"
+            404 -> "Not Found"
+            else -> "Error"
+        }
         out.write(("HTTP/1.1 $code $status\r\n" +
             "Content-Type: $type\r\n" +
             "Content-Length: ${data.size}\r\n" +
@@ -217,8 +297,11 @@ class StreamServer(
     /** Send bounded low-latency mono 48 kHz PCM16 chunks (no microphone capture). */
     fun setAudioAvailable(available: Boolean) { audioAvailable = available }
 
-    fun publishAudio(pcm: ByteArray) {
-        audioClients.forEach { it.offer(pcm) }
+    fun publishAudio(pcm: ByteArray, captureUptimeMs: Long) {
+        // Eight-byte little-endian capture timestamp, followed by PCM16 mono.
+        val packet = ByteBuffer.allocate(8 + pcm.size).order(ByteOrder.LITTLE_ENDIAN)
+            .putLong(captureUptimeMs).put(pcm).array()
+        audioClients.forEach { it.offer(packet) }
     }
 
     fun publishJpeg(jpeg: ByteArray) {
@@ -236,9 +319,11 @@ class StreamServer(
         audioClients.clear()
     }
 
-    private class WebsocketClient(val socket: Socket, val output: OutputStream) : AutoCloseable {
+    private class WebsocketClient(val socket: Socket, val output: OutputStream,
+        private val onDrop: () -> Unit) : AutoCloseable {
         private data class Packet(val type: Int, val bytes: ByteArray)
-        private val queue = LinkedBlockingDeque<Packet>(48)
+        private val queue = LinkedBlockingDeque<Packet>(12)
+        val queueDepth: Int get() = queue.size
         private val alive = AtomicBoolean(true)
         private var awaitingKeyframe = true
 
@@ -254,8 +339,8 @@ class StreamServer(
             if (awaitingKeyframe && !fragment.startsWithKeyframe) return
             if (fragment.startsWithKeyframe) awaitingKeyframe = false
             if (!queue.offer(Packet(2, fragment.bytes))) {
-                queue.clear() // a slow browser must rejoin on a new IDR
-                awaitingKeyframe = true
+                onDrop()
+                close() // a lagging viewer reconnects with a new init/keyframe
             }
         }
 
@@ -332,10 +417,13 @@ class StreamServer(
         }
     }
 
-    private class MjpegClient(val socket: Socket, val output: OutputStream) : AutoCloseable {
+    private class MjpegClient(val socket: Socket, val output: OutputStream,
+        private val onDrop: () -> Unit) : AutoCloseable {
         private val queue = LinkedBlockingDeque<ByteArray>(2)
+        val queueDepth: Int get() = queue.size
         fun offer(frame: ByteArray) {
             if (!queue.offer(frame)) {
+                onDrop()
                 queue.poll()
                 queue.offer(frame)
             }
