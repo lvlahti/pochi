@@ -10,7 +10,8 @@ data class StreamSettings(
     val fps: Int = 24,
     val bitrateKbps: Int = 2500,
     val jpegQuality: Int = 70,
-    val audio: Boolean = false
+    val audio: Boolean = false,
+    val autoQuality: Boolean = false
 ) {
     fun writeTo(intent: Intent): Intent = intent.apply {
         putExtra(KEY_TRANSPORT, transport)
@@ -20,6 +21,7 @@ data class StreamSettings(
         putExtra(KEY_BITRATE, bitrateKbps)
         putExtra(KEY_JPEG_QUALITY, jpegQuality)
         putExtra(KEY_AUDIO, audio)
+        putExtra(KEY_AUTO_QUALITY, autoQuality)
     }
 
     companion object {
@@ -34,6 +36,7 @@ data class StreamSettings(
         private const val KEY_BITRATE = "bitrate_kbps"
         private const val KEY_JPEG_QUALITY = "jpeg_quality"
         private const val KEY_AUDIO = "audio"
+        private const val KEY_AUTO_QUALITY = "auto_quality"
 
         fun from(intent: Intent): StreamSettings = StreamSettings(
             transport = if (intent.getStringExtra(KEY_TRANSPORT) == TRANSPORT_WIFI) TRANSPORT_WIFI else TRANSPORT_USB,
@@ -42,7 +45,8 @@ data class StreamSettings(
             fps = intent.getIntExtra(KEY_FPS, 24).coerceIn(5, 60),
             bitrateKbps = intent.getIntExtra(KEY_BITRATE, 2500).coerceIn(300, 16000),
             jpegQuality = intent.getIntExtra(KEY_JPEG_QUALITY, 70).coerceIn(20, 95),
-            audio = intent.getBooleanExtra(KEY_AUDIO, false)
+            audio = intent.getBooleanExtra(KEY_AUDIO, false),
+            autoQuality = intent.getBooleanExtra(KEY_AUTO_QUALITY, false)
         )
     }
 }
