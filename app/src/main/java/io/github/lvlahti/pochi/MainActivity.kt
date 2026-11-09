@@ -203,7 +203,30 @@ class MainActivity : Activity() {
             Intent("android.settings.TETHER_SETTINGS"),
             Intent(Intent.ACTION_MAIN).setClassName(
                 "com.android.settings",
-                "com.android.settings.Settings" + '
+                "com.android.settings.Settings" + '$' + "TetherSettingsActivity"
+            ),
+            Intent(Settings.ACTION_SETTINGS)
+        ) else listOf(
+            Intent(Settings.ACTION_WIFI_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS)
+        )
+        for ((index, destination) in destinations.withIndex()) {
+            try {
+                startActivity(destination)
+                if (usb && index == destinations.lastIndex) {
+                    Toast.makeText(this, "Open Portable hotspot → USB tethering", Toast.LENGTH_LONG).show()
+                }
+                return
+            } catch (_: ActivityNotFoundException) {
+                // OEM implementations vary.
+            } catch (_: SecurityException) {
+                // OEMs may restrict navigation to system-only screens.
+            }
+        }
+        Toast.makeText(this, "Open Settings → Portable hotspot → USB tethering", Toast.LENGTH_LONG).show()
+    }
+
+    private fun setup(spinner: Spinner, choices: Array<String>) {
         val adapter = ArrayAdapter(this, R.layout.spinner_item, choices)
         adapter.setDropDownViewResource(R.layout.spinner_dropdown_item)
         spinner.adapter = adapter
@@ -299,102 +322,6 @@ class MainActivity : Activity() {
             shareCard.alpha = 1f
             shareCard.translationY = 0f
         }
-    }
-
-    companion object {
-        private const val CAPTURE_REQUEST = 2401
-        private const val AUDIO_PERMISSION_REQUEST = 2402
-        private val EDGES = listOf(640, 960, 1280, 1600, 1920)
-        private val FRAME_RATES = listOf(15, 24, 30, 60)
-        private val BITRATES = listOf(750, 1500, 2500, 4000, 6500, 10000)
-        private val QUALITIES = listOf(40, 55, 70, 85, 95)
-    }
-} + "TetherSettingsActivity"
-            ),
-            Intent(Settings.ACTION_SETTINGS)
-        ) else listOf(
-            Intent(Settings.ACTION_WIFI_SETTINGS),
-            Intent(Settings.ACTION_SETTINGS)
-        )
-        for ((index, destination) in destinations.withIndex()) {
-            try {
-                startActivity(destination)
-                if (usb && index == destinations.lastIndex) {
-                    Toast.makeText(this, "Open Portable hotspot → USB tethering", Toast.LENGTH_LONG).show()
-                }
-                return
-            } catch (_: ActivityNotFoundException) {
-                // Different Android vendors expose different Settings screens.
-            } catch (_: SecurityException) {
-                // An OEM may block a non-system app from opening its internal activity.
-            }
-        }
-        Toast.makeText(this, "Open Settings → Portable hotspot → USB tethering", Toast.LENGTH_LONG).show()
-    }
-
-    private fun setup(spinner: Spinner, choices: Array<String>) {
-        val adapter = ArrayAdapter(this, R.layout.spinner_item, choices)
-        adapter.setDropDownViewResource(R.layout.spinner_dropdown_item)
-        spinner.adapter = adapter
-    }
-
-    private fun requestProjection() {
-        val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        @Suppress("DEPRECATION")
-        startActivityForResult(manager.createScreenCaptureIntent(), CAPTURE_REQUEST)
-    }
-
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == AUDIO_PERMISSION_REQUEST) {
-            if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) requestProjection()
-            else renderStatus("Microphone permission is needed for internal audio. Uncheck audio to share video only.", null, false)
-        }
-    }
-
-    override fun onStart() {
-        super.onStart()
-        val filter = IntentFilter(CaptureService.ACTION_STATUS)
-        if (Build.VERSION.SDK_INT >= 33) registerReceiver(statusReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
-        else { @Suppress("DEPRECATION") registerReceiver(statusReceiver, filter) }
-        renderStatus(CaptureService.status, CaptureService.url, CaptureService.running)
-    }
-
-    override fun onStop() {
-        unregisterReceiver(statusReceiver)
-        super.onStop()
-    }
-
-    @Deprecated("Platform callback retained to avoid adding AndroidX runtime dependencies")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != CAPTURE_REQUEST) return
-        if (resultCode != RESULT_OK || data == null) {
-            renderStatus("Screen capture permission declined", null, false)
-            return
-        }
-        val service = Intent(this, CaptureService::class.java).apply {
-            action = CaptureService.ACTION_START
-            putExtra(CaptureService.EXTRA_RESULT_CODE, resultCode)
-            putExtra(CaptureService.EXTRA_RESULT_DATA, data)
-            pendingSettings.writeTo(this)
-        }
-        startForegroundService(service)
-        renderStatus("Starting capture…", null, true)
-    }
-
-    private fun renderStatus(message: String, link: String?, active: Boolean) {
-        statusText.text = message
-        val isError = message.startsWith("Error:", ignoreCase = true) ||
-            message.contains("declined", ignoreCase = true) ||
-            message.contains("permission is needed", ignoreCase = true)
-        statusText.setTextColor(Color.parseColor(if (isError) "#FF5555" else "#DEDEDE"))
-        findViewById<TextView>(R.id.statusIndicator).setTextColor(Color.parseColor(
-            if (isError) "#FF5555" else if (active) "#FFFFFF" else "#A0A0A0"
-        ))
-        urlText.text = link.orEmpty()
-        startButton.isEnabled = !active
-        stopButton.isEnabled = active
     }
 
     companion object {
