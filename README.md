@@ -1,6 +1,12 @@
 # Pochi 🐾 — Android screen mirroring over USB or Wi-Fi
 
-**Pochi v0.2** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
+**Pochi v0.3** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
+
+## What's new in v0.3
+
+- **Monochrome UI:** both the Android app and the browser receiver use only black, white, and grayscale. Error messages are the only red UI elements.
+- **Browser volume slider:** after clicking **Enable audio**, a 0–100% slider appears beside the button. The slider controls a Web Audio `GainNode` immediately and disappears when audio is muted.
+- All v0.2 features—USB/Wi-Fi, rotation handling, custom video quality/FPS/bitrate, and optional internal audio—remain available.
 
 ## Features
 
@@ -34,7 +40,7 @@
 
 ## Build
 
-GitHub Actions → **Build Android APK** runs `:app:testDebugUnitTest` and `:app:assembleDebug` (Gradle 8.11.1, Android Gradle Plugin 8.9.2, Kotlin 2.1.20, Android 35). Successful pushes to `main` publish a **preview GitHub Release APK** and the workflow artifact contains the debug APK. You can also open this project in Android Studio with JDK 17.
+GitHub Actions → **Build and publish Pochi APK** runs `:app:testDebugUnitTest` and `:app:assembleDebug` (Gradle 8.11.1, Android Gradle Plugin 8.9.2, Kotlin 2.1.20, Android 35). Successful pushes to `main` publish a **preview GitHub Release APK** and the workflow artifact contains the debug APK. You can also open this project in Android Studio with JDK 17.
 
 Debug builds are signed with Android's debug key (not intended as production-signed releases). Uninstall earlier APKs if they were signed with a different key.
 
@@ -49,6 +55,6 @@ Debug builds are signed with Android's debug key (not intended as production-sig
 
 ## Status
 
-**v0.2 preview — CI build and unit tests; device-specific rotation/audio/Wi-Fi behavior should be tested on physical phones.** See `QUICKSTART-fa.md` for the Persian guide.
+**v0.3 preview — CI build and unit tests; device-specific rotation/audio/Wi-Fi behavior should be tested on physical phones.** See `QUICKSTART-fa.md` for the Persian guide.
 
 MIT License.
