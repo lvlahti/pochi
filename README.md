@@ -1,4 +1,4 @@
-# Pochi 🐾
+# Pochi
 
 Pochi mirrors an **Android screen to a Windows browser with a USB data cable**, using USB tethering for local network communication. No receiver installation, internet, or Wi-Fi is required.
 
