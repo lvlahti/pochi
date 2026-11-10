@@ -1,20 +1,20 @@
 # Pochi 🐾 — Android screen mirroring over USB or Wi-Fi
 
-**Pochi v0.6** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
+**Pochi v0.7** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
 
-## What's new in v0.6
+## What's new in v0.7
 
 - **Monochrome UI:** both the Android app and the browser receiver use only black, white, and grayscale. Error messages are the only red UI elements.
 - **Browser volume slider:** after clicking **Enable audio**, a 0–100% slider appears beside the button. The slider controls a Web Audio `GainNode` immediately and disappears when audio is muted.
-- All v0.6 features—USB/Wi-Fi, rotation handling, custom video quality/FPS/bitrate, and optional internal audio—remain available.
+- All v0.7 features—USB/Wi-Fi, rotation handling, custom video quality/FPS/bitrate, and optional internal audio—remain available.
 
-## v0.6 — Glass Edition
+## v0.7 — Glass Edition
 
 The Android sender and browser receiver now share a polished monochrome design inspired by premium desktop and mobile controls. Both have layered panels, soft highlights, rounded controls and deliberate motion. The browser uses frosted-glass CSS backdrop blur; Android uses efficient native gradient drawables and light elevation (no expensive continuous background blur). Key Android actions use responsive press animations and settings cards enter with a gentle stagger. Audio controls still reveal the real 0–100% Web Audio volume slider after clicking **Enable audio**.
 
 **Color rule:** black, white and grays only; red is reserved for error messages. Web transitions respect the reduced-motion accessibility preference.
 
-## v0.6 — live controls, secure-by-default link sharing and connection settings
+## v0.7 — live controls, secure-by-default link sharing and connection settings
 
 - **Live button states:** the Start live button becomes a green, disabled **You are live** indicator only after screen sharing succeeds and a browser URL is ready. A red **Stop live** button appears beneath it, and disappears when sharing stops. While Android capture permission is processing, the start button displays **Starting live…**.
 - **Copy or share viewer link:** a polished link card appears only during a confirmed session. **Copy link** copies the entire URL (including its temporary access token) to the clipboard; **Share** opens Android's share sheet so you can send the same link to another app. Don't share the link outside your trusted USB/Wi-Fi network.
@@ -22,7 +22,7 @@ The Android sender and browser receiver now share a polished monochrome design i
 
 The glass visual style, hardware-encoded H.264, optional MJPEG, local USB/Wi-Fi streaming, rotation and experimental internal audio remain in place.
 
-## v0.6 — streaming, performance and privacy
+## v0.7 — streaming, performance and privacy
 
 1. **Auto Quality:** optional on-device AIMD tuning of H.264 encoder bitrate via `MediaCodec.setParameters` without restarting screen capture. For MJPEG, quality and frame interval react to queue backpressure. Your selected settings remain upper limits. If a hardware encoder doesn't support dynamic bitrate, the phone keeps its original bitrate.
 2. **Cinema Mode:** a distraction-free full-viewport browser view with auto-hiding glass controls; move the mouse or touch to reveal controls, and press Escape to exit.
@@ -32,6 +32,13 @@ The glass visual style, hardware-encoded H.264, optional MJPEG, local USB/Wi-Fi 
 6. **Improved audio alignment:** the phone timestamps 48 kHz mono PCM packets with Android elapsed realtime, the browser estimates clock offset and schedules a bounded audio queue based on measured playback-buffer delay. Exact frame-accurate synchronization is **not guaranteed**; DRM/audio capture restrictions continue to apply.
 
 **Note:** QR creation uses ZXing Core offline. No cloud server is used. Browser features require modern Chrome/Edge.
+
+## v0.7 — unified brand icon & GitHub profile
+
+- A crisp vector Pochi ring logo now appears as the Android launcher adaptive icon (including Android themed/monochrome icons), and in the Android app header. It matches the monochrome rounded-square emblem in the browser header.
+- The browser exposes `/favicon.svg` using the same logo, so tabs and bookmarks display a sharp Pochi icon.
+- The Android app footer features a tappable **GitHub / @lvlahti** link to the creator's public profile: [github.com/lvlahti](https://github.com/lvlahti), rather than the repository.
+- No change to screen sharing, media formats, authorization, or automatic quality behavior from v0.6.
 
 ## Features
 
@@ -80,6 +87,6 @@ Debug builds are signed with Android's debug key (not intended as production-sig
 
 ## Status
 
-**v0.6 preview — CI build and unit tests; device-specific rotation/audio/Wi-Fi behavior should be tested on physical phones.** See `QUICKSTART-fa.md` for the Persian guide.
+**v0.7 preview — CI build and unit tests; device-specific rotation/audio/Wi-Fi behavior should be tested on physical phones.** See `QUICKSTART-fa.md` for the Persian guide.
 
 MIT License.

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- The entire mark fits Android's adaptive icon safe zone. -->
+    <path android:fillColor="#252525"
+        android:pathData="M36,17 L72,17 C84,17 91,24 91,36 L91,72 C91,84 84,91 72,91 L36,91 C24,91 17,84 17,72 L17,36 C17,24 24,17 36,17 Z"/>
+    <path android:fillColor="#565656"
+        android:pathData="M36,18 L72,18 C83,18 90,25 90,36 L90,44 C71,35 48,32 18,51 L18,36 C18,25 25,18 36,18 Z"/>
+    <path android:fillColor="@android:color/transparent" android:strokeWidth="1.5"
+        android:strokeColor="#8B8B8B"
+        android:pathData="M36,17 L72,17 C84,17 91,24 91,36 L91,72 C91,84 84,91 72,91 L36,91 C24,91 17,84 17,72 L17,36 C17,24 24,17 36,17 Z"/>
+    <path android:fillColor="#777777" android:fillType="evenOdd"
+        android:pathData="M54,29 A25,25 0,1 1,53.99 29 Z M54,44 A10,10 0,1 0,53.99 44 Z"/>
+    <path android:fillColor="#F9F9F9" android:fillType="evenOdd"
+        android:pathData="M54,33 A21,21 0,1 1,53.99 33 Z M54,41.5 A12.5,12.5 0,1 0,53.99 41.5 Z"/>
+</vector>

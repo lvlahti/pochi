@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Pochi">
+  <defs>
+    <linearGradient id="glass" x1=".13" x2=".88" y1="0" y2="1">
+      <stop offset="0" stop-color="#676767"/>
+      <stop offset=".52" stop-color="#343434"/>
+      <stop offset="1" stop-color="#171717"/>
+    </linearGradient>
+    <radialGradient id="shine" cx=".27" cy=".12" r=".9">
+      <stop offset="0" stop-color="#ffffff" stop-opacity=".23"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="1.5" y="1.5" width="61" height="61" rx="16" fill="url(#glass)" stroke="#878787" stroke-width="1.5"/>
+  <rect x="3.5" y="3.5" width="57" height="57" rx="14.5" fill="url(#shine)" />
+  <rect x="4" y="4" width="56" height="56" rx="13.5" fill="none" stroke="#ffffff" stroke-opacity=".12"/>
+  <circle cx="32" cy="32" r="17" fill="none" stroke="#ffffff" stroke-opacity=".14" stroke-width="8"/>
+  <circle cx="32" cy="32" r="14.2" fill="none" stroke="#f9f9f9" stroke-width="6.2"/>
+</svg>

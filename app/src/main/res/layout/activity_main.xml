@@ -21,14 +21,11 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <TextView
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@drawable/pochi_logo"
-                android:gravity="center"
-                android:text="◉"
-                android:textColor="#FFFFFF"
-                android:textSize="25sp" />
+            <ImageView
+                android:layout_width="43dp"
+                android:layout_height="43dp"
+                android:src="@drawable/pochi_brand_mark"
+                android:contentDescription="Pochi logo" />
             <LinearLayout
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -59,7 +56,7 @@
                 android:gravity="center"
                 android:paddingLeft="13dp"
                 android:paddingRight="13dp"
-                android:text="v 0.6"
+                android:text="v 0.7"
                 android:textColor="#E9E9E9"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -488,14 +485,38 @@
             </LinearLayout>
         </LinearLayout>
 
-        <TextView
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="25dp"
+            android:layout_marginTop="27dp"
             android:gravity="center"
-            android:lineSpacingExtra="5dp"
-            android:text="Designed for your screen, not the cloud.\nOnly share on networks you trust."
-            android:textColor="#7B7B7B"
-            android:textSize="11sp" />
+            android:orientation="vertical">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:lineSpacingExtra="5dp"
+                android:text="Designed for your screen, not the cloud.\nOnly share on networks you trust."
+                android:textColor="#969696"
+                android:textSize="11sp" />
+            <TextView
+                android:id="@+id/githubProfileLink"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/pochi_chip"
+                android:paddingLeft="19dp"
+                android:paddingRight="19dp"
+                android:paddingTop="13dp"
+                android:paddingBottom="13dp"
+                android:gravity="center"
+                android:text="GitHub   /   @lvlahti    ↗"
+                android:textColor="#F6F6F6"
+                android:textSize="13sp"
+                android:textStyle="bold"
+                android:clickable="true"
+                android:focusable="true"
+                android:contentDescription="Open GitHub profile lvlahti" />
+        </LinearLayout>
     </LinearLayout>
 </ScrollView>
