@@ -129,10 +129,10 @@ class StreamServer(
             val authorized = requestToken == token
             val viewerId = path.substringAfter("&viewer=", "").substringBefore('&')
             val viewerIp = socket.inetAddress.hostAddress.orEmpty()
-            if (!authorized && resource != "/app.js" && resource != "/style.css") {
+            if (!authorized && resource != "/app.js" && resource != "/style.css" && resource != "/favicon.svg") {
                 respond(output, 403, "text/plain", "Invalid Pochi viewer link".toByteArray()); return
             }
-            if (resource != "/" && resource != "/app.js" && resource != "/style.css" &&
+            if (resource != "/" && resource != "/app.js" && resource != "/style.css" && resource != "/favicon.svg" &&
                 resource != "/authorize" && !gate.authorized(viewerId, viewerIp)) {
                 respond(output, 403, "text/plain", "Approve this viewer on your phone first".toByteArray())
                 return
@@ -148,6 +148,7 @@ class StreamServer(
                 "/" -> serveAsset(output, "index.html", "text/html; charset=utf-8")
                 "/app.js" -> serveAsset(output, "app.js", "text/javascript; charset=utf-8")
                 "/style.css" -> serveAsset(output, "style.css", "text/css; charset=utf-8")
+                "/favicon.svg" -> serveAsset(output, "favicon.svg", "image/svg+xml; charset=utf-8")
                 "/status" -> respond(output, 200, "application/json", JSONObject().apply {
                     val metrics = stats()
                     put("mode", settings.mode)
