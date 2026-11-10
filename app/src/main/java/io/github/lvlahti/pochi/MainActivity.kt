@@ -18,6 +18,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.Settings
 import android.graphics.Color
+import android.net.Uri
 import android.graphics.Bitmap
 import android.view.MotionEvent
 import android.view.View
@@ -145,6 +146,13 @@ class MainActivity : Activity() {
             }
         }
         settingsButton.setOnClickListener { openNetworkSettings() }
+        findViewById<View>(R.id.githubProfileLink).setOnClickListener {
+            try {
+                startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/lvlahti")))
+            } catch (_: ActivityNotFoundException) {
+                Toast.makeText(this, "No browser available to open GitHub", Toast.LENGTH_LONG).show()
+            }
+        }
         copyLinkButton.setOnClickListener {
             val link = currentShareUrl ?: return@setOnClickListener
             val clipboard = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
@@ -192,6 +200,7 @@ class MainActivity : Activity() {
         animatePress(startButton)
         animatePress(stopButton)
         animatePress(settingsButton)
+        animatePress(findViewById(R.id.githubProfileLink))
         animatePress(copyLinkButton)
         animatePress(shareLinkButton)
         animateEntrance()
