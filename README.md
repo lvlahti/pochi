@@ -1,4 +1,4 @@
-# Pochi 🐾 — Android screen mirroring over USB or Wi-Fi
+# Pochi  — Android screen mirroring over USB or Wi-Fi
 
 **Pochi v0.7** is a lightweight, native Android app that shares your phone screen with a browser on Windows, macOS, or Linux over a **USB tether network or your local Wi-Fi network**. You do not install anything on the viewing computer.
 
